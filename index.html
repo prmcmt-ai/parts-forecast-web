@@ -221,6 +221,7 @@
             <th class="num">สต๊อก-เชื่อม</th>
             <th class="num">สต๊อก-สโตร์</th>
             <th class="num">ค้างส่ง</th>
+            <th class="num">รวมสต๊อก</th>
             <th class="num">MOQ</th>
             <th class="num">ใช้ได้อีก (ด.)</th>
             <th class="num">Forecast ไตรมาส</th>
@@ -230,7 +231,7 @@
           </tr>
         </thead>
         <tbody id="tableBody">
-          <tr><td colspan="10" class="empty-hint">กำลังโหลดข้อมูล...</td></tr>
+          <tr><td colspan="11" class="empty-hint">กำลังโหลดข้อมูล...</td></tr>
         </tbody>
       </table>
     </div>
@@ -2411,7 +2412,7 @@ function renderTable(){
   }
 
   if(!parts.length){
-    tbody.innerHTML = '<tr><td colspan="10" class="empty-hint">ไม่พบข้อมูล — ลองกด "โหลดข้อมูลเริ่มต้น" ด้านบน หรือปรับตัวกรอง</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="11" class="empty-hint">ไม่พบข้อมูล — ลองกด "โหลดข้อมูลเริ่มต้น" ด้านบน หรือปรับตัวกรอง</td></tr>';
     return;
   }
 
@@ -2427,6 +2428,7 @@ function renderTable(){
         <td class="num"><input class="editable" type="number" value="${p.stockWeld||0}" data-field="stockWeld" data-code="${p.code}"></td>
         <td class="num"><input class="editable" type="number" value="${p.stockStore||0}" data-field="stockStore" data-code="${p.code}"></td>
         <td class="num"><input class="editable" type="number" value="${p.pending||0}" data-field="pending" data-code="${p.code}"></td>
+        <td class="num"><b>${fmt(getTotalStock(p))}</b></td>
         <td class="num"><input class="editable" type="number" value="${p.moq||0}" data-field="moq" data-code="${p.code}"></td>
         <td class="num"><span class="months-tag ${mClass}">${months>=999?'∞':months.toFixed(1)}</span></td>
         <td class="num">${fmt(forecastQ)}</td>
