@@ -106,6 +106,8 @@
     border:1px solid var(--border); background:#fff; padding:5px 10px; border-radius:6px; font-size:12px; cursor:pointer; font-family:inherit;
   }
   .manage-btn:hover{background:var(--gray-bg);}
+  .withdraw-btn{border-color:#bbf7d0; color:var(--green);}
+  .withdraw-btn:hover{background:var(--green-bg);}
 
   .sidebar h3{font-size:14px; margin:0; padding:12px 14px; border-bottom:1px solid var(--border);}
   #activityFeed{max-height:640px; overflow-y:auto; padding:6px 0;}
@@ -274,7 +276,7 @@ const firebaseConfig = {
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import {
   getFirestore, collection, doc, setDoc, updateDoc, onSnapshot,
-  addDoc, serverTimestamp, query, orderBy, limit, writeBatch, getDoc
+  addDoc, serverTimestamp, query, orderBy, limit, writeBatch, getDoc, increment
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
@@ -3437,7 +3439,21 @@ function loadUserFromStorage(){
 function defaultQuarterState(){
   return {status:'need', requestedQty:0, requestedBy:'', requestedAt:null,
           poNumber:'', orderedQty:0, orderedBy:'', orderedAt:null,
-          receivedQty:0, receivedBy:'', receivedAt:null, note:''};
+          receivedQty:0, receivedBy:'', receivedAt:null, note:'', actualUsed:0};
+}
+// วันที่เริ่ม-สิ้นสุดของแต่ละไตรมาส (ปีงบประมาณ 69-70 : ก.ค. 2569 - มิ.ย. 2570)
+const QUARTER_DATE_RANGES = {
+  q3: ['2026-07-01','2026-09-30'],
+  q4: ['2026-10-01','2026-12-31'],
+  q1: ['2027-01-01','2027-03-31'],
+  q2: ['2027-04-01','2027-06-30']
+};
+function dateToQuarterKey(dateStr){
+  for(const key of Object.keys(QUARTER_DATE_RANGES)){
+    const [start,end] = QUARTER_DATE_RANGES[key];
+    if(dateStr >= start && dateStr <= end) return key;
+  }
+  return null;
 }
 function ensureQuarters(part){
   part.quarters = part.quarters || {};
@@ -3566,7 +3582,12 @@ function renderTable(){
         <td class="num">${fmt(forecastQ)}</td>
         <td class="num"><b>${recommended>0?fmt(recommended):'-'}</b></td>
         <td><span class="badge ${badgeClass}">${badgeLabel}</span></td>
-        <td><button class="manage-btn" data-code="${p.code}" data-action="manage">จัดการ</button></td>
+        <td>
+          <div style="display:flex; flex-direction:column; gap:4px;">
+            <button class="manage-btn" data-code="${p.code}" data-action="manage">จัดการ</button>
+            <button class="manage-btn withdraw-btn" data-code="${p.code}" data-action="withdraw">เบิกใช้</button>
+          </div>
+        </td>
       </tr>`;
   }).join('');
 
@@ -3575,6 +3596,9 @@ function renderTable(){
   });
   tbody.querySelectorAll('[data-action="manage"]').forEach(btn=>{
     btn.addEventListener('click', ()=> openModal(btn.dataset.code));
+  });
+  tbody.querySelectorAll('[data-action="withdraw"]').forEach(btn=>{
+    btn.addEventListener('click', ()=> openWithdrawModal(btn.dataset.code));
   });
 }
 
@@ -3699,6 +3723,7 @@ function openModal(code){
       <div><span>Forecast ไตรมาสนี้</span>${fmt(forecastQ)}</div>
       <div><span>MOQ</span>${fmt(part.moq)}</div>
       <div><span>ยอดแนะนำสั่ง</span><b>${fmt(recommended)}</b></div>
+      <div><span>เบิกใช้จริงไตรมาสนี้</span>${fmt(qState.actualUsed||0)}</div>
     </div>
     ${actionHtml}
   `;
@@ -3711,9 +3736,110 @@ function openModal(code){
   document.getElementById('modalBackdrop').classList.add('show');
 }
 
-function closeModal(){ document.getElementById('modalBackdrop').classList.remove('show'); }
+let withdrawUnsub = null;
+function closeModal(){
+  document.getElementById('modalBackdrop').classList.remove('show');
+  if(withdrawUnsub){ withdrawUnsub(); withdrawUnsub = null; }
+}
 document.getElementById('modalClose').addEventListener('click', closeModal);
 document.getElementById('modalBackdrop').addEventListener('click', (e)=>{ if(e.target.id==='modalBackdrop') closeModal(); });
+
+// ---------------- บันทึกเบิกใช้ (คลังอะไหล่) ----------------
+function todayStr(){
+  const d = new Date();
+  const tz = d.getTimezoneOffset() * 60000;
+  return new Date(d - tz).toISOString().slice(0,10);
+}
+function openWithdrawModal(code){
+  const part = partsCache[code];
+  if(!part) return;
+  if(withdrawUnsub){ withdrawUnsub(); withdrawUnsub = null; }
+
+  document.getElementById('modalTitle').textContent = `บันทึกเบิกใช้ — ${part.code} ${part.name}`;
+  document.getElementById('modalSub').textContent = `สต๊อกคงเหลือปัจจุบัน: ${fmt(part.stock||0)}`;
+
+  document.getElementById('modalBody').innerHTML = `
+    <div class="field-row">
+      <label>วันที่เบิก</label>
+      <input type="date" id="inpWDate" value="${todayStr()}">
+    </div>
+    <div class="field-row">
+      <label>จำนวนที่เบิกใช้</label>
+      <input type="number" id="inpWQty" min="1" placeholder="เช่น 20">
+    </div>
+    <div class="field-row">
+      <label>แผนกที่เบิกไปใช้</label>
+      <input type="text" id="inpWDept" list="deptSuggestions" placeholder="เช่น แผนกผลิต, แผนกซ่อมบำรุง">
+      <datalist id="deptSuggestions">
+        <option value="แผนกผลิต">
+        <option value="แผนกประกอบ">
+        <option value="แผนกซ่อมบำรุง">
+        <option value="แผนกQC/ตรวจสอบคุณภาพ">
+      </datalist>
+    </div>
+    <div class="field-row">
+      <label>หมายเหตุ (ถ้ามี)</label>
+      <textarea id="inpWNote" rows="2"></textarea>
+    </div>
+    <div class="modal-actions">
+      <button class="btn" id="btnLogWithdraw">บันทึกการเบิกใช้ (คลังอะไหล่)</button>
+    </div>
+    <hr style="border:none;border-top:1px solid #eee;margin:16px 0 10px;">
+    <div style="font-size:12.5px; font-weight:600; color:var(--muted); margin-bottom:6px;">ประวัติการเบิกใช้ล่าสุด</div>
+    <div id="withdrawHistory" class="action-log"><div class="empty-hint" style="padding:10px 0;">กำลังโหลด...</div></div>
+  `;
+
+  document.getElementById('btnLogWithdraw').addEventListener('click', ()=> doLogWithdrawal(code));
+
+  const q = query(collection(db,'parts',code,'withdrawals'), orderBy('date','desc'), limit(15));
+  withdrawUnsub = onSnapshot(q, (snap)=>{
+    const histEl = document.getElementById('withdrawHistory');
+    if(!histEl) return;
+    if(snap.empty){
+      histEl.innerHTML = '<div class="empty-hint" style="padding:10px 0;">ยังไม่มีประวัติการเบิกใช้</div>';
+      return;
+    }
+    histEl.innerHTML = snap.docs.map(d=>{
+      const w = d.data();
+      return `<div class="row"><b>${w.date||''}</b> — ${fmt(w.qty||0)} หน่วย — แผนก: ${escapeHtml(w.department||'-')} ${w.note?(' — '+escapeHtml(w.note)):''} <span style="color:var(--muted);">(${escapeHtml(w.recordedBy||'')})</span></div>`;
+    }).join('');
+  }, (err)=>console.error(err));
+
+  document.getElementById('modalBackdrop').classList.add('show');
+}
+
+async function doLogWithdrawal(code){
+  if(!firebaseReady) return alert('ยังไม่ได้เชื่อมต่อฐานข้อมูล');
+  const date = document.getElementById('inpWDate').value;
+  const qty = Number(document.getElementById('inpWQty').value) || 0;
+  const department = document.getElementById('inpWDept').value.trim();
+  const note = document.getElementById('inpWNote').value.trim();
+  if(!date) return alert('กรุณาระบุวันที่เบิก');
+  if(qty <= 0) return alert('กรุณาระบุจำนวนที่เบิกใช้ให้ถูกต้อง');
+  if(!department) return alert('กรุณาระบุแผนกที่เบิกไปใช้');
+
+  const part = partsCache[code];
+  if(part && qty > (part.stock||0)){
+    if(!confirm(`จำนวนที่เบิก (${fmt(qty)}) มากกว่าสต๊อกคงเหลือ (${fmt(part.stock||0)}) ต้องการบันทึกต่อหรือไม่?`)) return;
+  }
+
+  const {name, dept} = currentUser();
+  try{
+    await addDoc(collection(db,'parts',code,'withdrawals'), {
+      date, qty, department, note, recordedBy:name, recordedAt: serverTimestamp()
+    });
+    const updates = {stock: increment(-qty)};
+    const qKey = dateToQuarterKey(date);
+    if(qKey){ updates[`quarters.${qKey}.actualUsed`] = increment(qty); }
+    await updateDoc(doc(db,'parts',code), updates);
+    await logActivity(name, dept, `บันทึกเบิกใช้ ${code} จำนวน ${fmt(qty)} ให้แผนก "${department}" (วันที่ ${date})`);
+    document.getElementById('inpWQty').value = '';
+    document.getElementById('inpWNote').value = '';
+  }catch(err){
+    console.error(err);
+    alert('บันทึกไม่สำเร็จ: ' + err.message);
+  }
+}
 
 async function doRequest(code, q){
   const {name, dept} = currentUser();
