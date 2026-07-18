@@ -77,7 +77,7 @@
   table{width:100%; border-collapse:collapse; font-size:12.8px;}
   thead th{
     background:#f9fafb; text-align:left; padding:9px 8px; border-bottom:1px solid var(--border);
-    font-weight:600; color:#374151; white-space:nowrap; position:sticky; top:57px;
+    font-weight:600; color:#374151; white-space:nowrap;
   }
   tbody td{padding:8px; border-bottom:1px solid #f1f2f4; vertical-align:middle;}
   tbody tr:hover{background:#fafbfc;}
@@ -94,6 +94,7 @@
     display:inline-block; padding:3px 9px; border-radius:999px; font-size:11.5px; font-weight:700; white-space:nowrap;
   }
   .badge.need{background:var(--red-bg); color:var(--red);}
+  .badge.noneed{background:var(--green-bg); color:var(--green);}
   .badge.requested{background:var(--amber-bg); color:var(--amber);}
   .badge.ordered{background:var(--blue-bg); color:var(--primary);}
   .badge.received{background:var(--green-bg); color:var(--green);}
@@ -3498,12 +3499,26 @@ function startListeners(){
 }
 
 // ---------------- rendering ----------------
+function getRecommended(p, quarter){
+  const totalStock = (p.stock||0) + (p.pending||0);
+  const forecastQ = p.forecast?.[quarter] || 0;
+  return ceilToMOQ(forecastQ - totalStock, p.moq||0);
+}
+function getBadgeInfo(p, quarter){
+  const qState = p.quarters[quarter] || defaultQuarterState();
+  if(qState.status === 'need'){
+    const recommended = getRecommended(p, quarter);
+    return recommended > 0 ? {cls:'need', label:'ต้องสั่ง'} : {cls:'noneed', label:'ไม่ต้องสั่ง'};
+  }
+  return {cls: qState.status, label: STATUS_LABEL[qState.status]};
+}
+
 function renderCards(){
   const parts = Object.values(partsCache);
   document.getElementById('cardTotal').textContent = parts.length || '-';
   const urgent = parts.filter(p=> computeMonths(p) < 3).length;
   document.getElementById('cardUrgent').textContent = parts.length ? urgent : '-';
-  const pending = parts.filter(p=> (p.quarters[activeQuarter]?.status||'need') !== 'received').length;
+  const pending = parts.filter(p=> { const b = getBadgeInfo(p, activeQuarter); return b.cls !== 'received' && b.cls !== 'noneed'; }).length;
   document.getElementById('cardPending').textContent = parts.length ? pending : '-';
   const received = parts.filter(p=> (p.quarters[activeQuarter]?.status) === 'received').length;
   document.getElementById('cardReceived').textContent = parts.length ? received : '-';
@@ -3527,7 +3542,7 @@ function renderTable(){
   if(activeFilter === 'urgent'){
     parts = parts.filter(p=> computeMonths(p) < 3);
   } else if(activeFilter === 'pending'){
-    parts = parts.filter(p=> (p.quarters[activeQuarter]?.status||'need') !== 'received');
+    parts = parts.filter(p=> { const b = getBadgeInfo(p, activeQuarter); return b.cls !== 'received' && b.cls !== 'noneed'; });
   }
 
   if(!parts.length){
@@ -3538,11 +3553,9 @@ function renderTable(){
   tbody.innerHTML = parts.map(p=>{
     const months = computeMonths(p);
     const mClass = monthsClass(months);
-    const totalStock = (p.stock||0) + (p.pending||0);
     const forecastQ = p.forecast?.[activeQuarter] || 0;
-    const recommended = ceilToMOQ(forecastQ - totalStock, p.moq||0);
-    const qState = p.quarters[activeQuarter] || defaultQuarterState();
-    const badgeClass = qState.status;
+    const recommended = getRecommended(p, activeQuarter);
+    const {cls: badgeClass, label: badgeLabel} = getBadgeInfo(p, activeQuarter);
     return `
       <tr data-code="${p.code}">
         <td><div class="code">${p.code}</div><div class="name">${escapeHtml(p.name||'')}</div></td>
@@ -3552,7 +3565,7 @@ function renderTable(){
         <td class="num"><span class="months-tag ${mClass}">${months>=999?'∞':months.toFixed(1)}</span></td>
         <td class="num">${fmt(forecastQ)}</td>
         <td class="num"><b>${recommended>0?fmt(recommended):'-'}</b></td>
-        <td><span class="badge ${badgeClass}">${STATUS_LABEL[qState.status]}</span></td>
+        <td><span class="badge ${badgeClass}">${badgeLabel}</span></td>
         <td><button class="manage-btn" data-code="${p.code}" data-action="manage">จัดการ</button></td>
       </tr>`;
   }).join('');
