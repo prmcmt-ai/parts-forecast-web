@@ -294,6 +294,31 @@ const DEPT_LABEL = {planning:'Planning', purchasing:'จัดซื้อ', war
 // ลำดับการเรียงตาราง: ต้องสั่งก่อนเสมอ (บนสุด) → กำลังดำเนินการ → รับของแล้ว/ไม่ต้องสั่ง (ล่างสุด)
 const SORT_PRIORITY = {need:0, requested:1, ordered:2, received:3, noneed:4};
 
+// ---------- ยอดต้องการใช้จริง จากไฟล์ "ยอดงานโปรเท็น.xlsx" (งานไถ 7 จาน ยืนยันสั่งซื้อแล้ว 221 ชุด, Q3/69) ----------
+// ใช้เทียบ/ค้ำยันกับ Forecast (ประมาณการ) เพื่อให้ยอดแนะนำสั่งไม่ต่ำกว่าความต้องการจริงที่ยืนยันแล้ว
+const REAL_DEMAND = {
+  'DT320A':      {qty:442, quarter:'q3', label:'ยืนยันจริง (ไถ 7 จาน 221 ชุด)'},
+  'DT321A':      {qty:221, quarter:'q3', label:'ยืนยันจริง (ไถ 7 จาน 221 ชุด)'},
+  'DT322':       {qty:221, quarter:'q3', label:'ยืนยันจริง (ไถ 7 จาน 221 ชุด)'},
+  'DT323':       {qty:442, quarter:'q3', label:'ยืนยันจริง (ไถ 7 จาน 221 ชุด)'},
+  'DT324':       {qty:663, quarter:'q3', label:'ยืนยันจริง (ไถ 7 จาน 221 ชุด)'},
+  'DT325A':      {qty:221, quarter:'q3', label:'ยืนยันจริง (ไถ 7 จาน 221 ชุด)'},
+  'DT325B':      {qty:221, quarter:'q3', label:'ยืนยันจริง (ไถ 7 จาน 221 ชุด)'},
+  'DT329':       {qty:221, quarter:'q3', label:'ยืนยันจริง (ไถ 7 จาน 221 ชุด)'},
+  'DT330':       {qty:221, quarter:'q3', label:'ยืนยันจริง (ไถ 7 จาน 221 ชุด)'},
+  'DT331':       {qty:221, quarter:'q3', label:'ยืนยันจริง (ไถ 7 จาน 221 ชุด)'},
+  'DT332':       {qty:221, quarter:'q3', label:'ยืนยันจริง (ไถ 7 จาน 221 ชุด)'},
+  'DT333':       {qty:442, quarter:'q3', label:'ยืนยันจริง (ไถ 7 จาน 221 ชุด)'},
+  'DT334':       {qty:663, quarter:'q3', label:'ยืนยันจริง (ไถ 7 จาน 221 ชุด)'},
+  'M27-10-1202': {qty:221, quarter:'q3', label:'ยืนยันจริง (ไถ 7 จาน 221 ชุด)'},
+  'M27-10-1203': {qty:221, quarter:'q3', label:'ยืนยันจริง (ไถ 7 จาน 221 ชุด)'},
+  'DT120B':      {qty:221, quarter:'q3', label:'ยืนยันจริง (ไถ 7 จาน 221 ชุด)'}
+};
+function getRealDemand(p, quarter){
+  const rd = REAL_DEMAND[p.code];
+  return (rd && rd.quarter === quarter) ? rd : null;
+}
+
 // ---------- ข้อมูลเริ่มต้นจากไฟล์ Forcast proten.xlsx (97 รายการ) ----------
 const SEED_DATA = [
   {
@@ -2361,7 +2386,9 @@ function getTotalStock(p){
 function getRecommended(p, quarter){
   const totalStock = getTotalStock(p);
   const forecastQ = p.forecast?.[quarter] || 0;
-  return ceilToMOQ(forecastQ - totalStock, p.moq||0);
+  const rd = getRealDemand(p, quarter);
+  const demandQ = rd ? Math.max(forecastQ, rd.qty) : forecastQ;
+  return ceilToMOQ(demandQ - totalStock, p.moq||0);
 }
 function getBadgeInfo(p, quarter){
   const qState = p.quarters[quarter] || defaultQuarterState();
@@ -2422,6 +2449,7 @@ function renderTable(){
     const forecastQ = p.forecast?.[activeQuarter] || 0;
     const recommended = getRecommended(p, activeQuarter);
     const {cls: badgeClass, label: badgeLabel} = getBadgeInfo(p, activeQuarter);
+    const realDemand = getRealDemand(p, activeQuarter);
     return `
       <tr data-code="${p.code}">
         <td><div class="code">${p.code}</div><div class="name">${escapeHtml(p.name||'')}</div></td>
@@ -2431,7 +2459,7 @@ function renderTable(){
         <td class="num"><b>${fmt(getTotalStock(p))}</b></td>
         <td class="num"><input class="editable" type="number" value="${p.moq||0}" data-field="moq" data-code="${p.code}"></td>
         <td class="num"><span class="months-tag ${mClass}">${months>=999?'∞':months.toFixed(1)}</span></td>
-        <td class="num">${fmt(forecastQ)}</td>
+        <td class="num">${fmt(forecastQ)}${realDemand ? `<div style="font-size:11px;color:var(--red);margin-top:2px;" title="${realDemand.label}">จริง ${fmt(realDemand.qty)}</div>` : ''}</td>
         <td class="num"><b>${recommended>0?fmt(recommended):'-'}</b></td>
         <td><span class="badge ${badgeClass}">${badgeLabel}</span></td>
         <td>
@@ -2509,7 +2537,8 @@ function openModal(code){
   const qState = part.quarters[q] || defaultQuarterState();
   const totalStock = getTotalStock(part);
   const forecastQ = part.forecast?.[q] || 0;
-  const recommended = ceilToMOQ(forecastQ - totalStock, part.moq||0);
+  const recommended = getRecommended(part, q);
+  const realDemand = getRealDemand(part, q);
 
   document.getElementById('modalTitle').textContent = `${part.code} — ${part.name}`;
   document.getElementById('modalSub').textContent = QUARTERS.find(x=>x.key===q).label;
@@ -2572,10 +2601,11 @@ function openModal(code){
     <div class="stepper">${stepperHtml}</div>
     <div class="info-grid">
       <div><span>สต๊อก(เชื่อม+สโตร์)+ค้างส่ง</span>${fmt(totalStock)}</div>
-      <div><span>Forecast ไตรมาสนี้</span>${fmt(forecastQ)}</div>
+      <div><span>Forecast ไตรมาสนี้ (ประมาณการ)</span>${fmt(forecastQ)}</div>
       <div><span>MOQ</span>${fmt(part.moq)}</div>
       <div><span>ยอดแนะนำสั่ง</span><b>${fmt(recommended)}</b></div>
       <div><span>เบิกใช้จริงไตรมาสนี้</span>${fmt(qState.actualUsed||0)}</div>
+      ${realDemand ? `<div><span style="color:var(--red);">ยอดต้องการใช้จริง (${escapeHtml(realDemand.label)})</span><b style="color:var(--red);">${fmt(realDemand.qty)}</b></div>` : ''}
     </div>
     ${actionHtml}
   `;
