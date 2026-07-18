@@ -1,0 +1,3842 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ระบบวางแผน-จัดซื้อ-คลังอะไหล่ (Forecast &amp; Order Tracking)</title>
+<style>
+  :root{
+    --bg:#f4f6f8; --panel:#ffffff; --border:#e2e5ea; --text:#1f2937; --muted:#6b7280;
+    --primary:#2563eb; --primary-dark:#1d4ed8; --green:#16a34a; --green-bg:#dcfce7;
+    --amber:#d97706; --amber-bg:#fef3c7; --red:#dc2626; --red-bg:#fee2e2;
+    --blue-bg:#dbeafe; --gray-bg:#f3f4f6;
+    --shadow: 0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.04);
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; font-family: "Segoe UI","Noto Sans Thai",Tahoma,sans-serif;
+    background:var(--bg); color:var(--text); font-size:14px;
+  }
+  header{
+    background:var(--panel); border-bottom:1px solid var(--border);
+    padding:14px 20px; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px;
+    position:sticky; top:0; z-index:50;
+  }
+  header h1{font-size:17px; margin:0; font-weight:700;}
+  header .sub{font-size:12px; color:var(--muted); margin-top:2px;}
+  .status-pill{
+    display:inline-flex; align-items:center; gap:6px; padding:4px 10px; border-radius:999px;
+    font-size:12px; font-weight:600; background:var(--gray-bg); color:var(--muted);
+  }
+  .status-pill.on{background:var(--green-bg); color:var(--green);}
+  .status-pill.off{background:var(--red-bg); color:var(--red);}
+  .dot{width:7px;height:7px;border-radius:50%;background:currentColor;}
+  .role-box{display:flex; align-items:center; gap:8px; font-size:13px;}
+  .role-box select, .role-box input{
+    padding:6px 8px; border:1px solid var(--border); border-radius:6px; font-size:13px; font-family:inherit;
+  }
+  main{padding:16px 20px 60px; max-width:1500px; margin:0 auto;}
+  .cards{display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:12px; margin-bottom:16px;}
+  .card{background:var(--panel); border:1px solid var(--border); border-radius:10px; padding:14px 16px; box-shadow:var(--shadow);}
+  .card .num{font-size:24px; font-weight:700;}
+  .card .label{font-size:12px; color:var(--muted); margin-top:2px;}
+  .card.urgent .num{color:var(--red);}
+  .card.pending .num{color:var(--amber);}
+  .card.ok .num{color:var(--green);}
+
+  .toolbar{
+    background:var(--panel); border:1px solid var(--border); border-radius:10px; padding:12px 14px;
+    display:flex; flex-wrap:wrap; align-items:center; gap:10px; margin-bottom:14px; box-shadow:var(--shadow);
+  }
+  .toolbar input[type=text]{
+    padding:7px 10px; border:1px solid var(--border); border-radius:6px; font-size:13px; width:220px; font-family:inherit;
+  }
+  .qtabs{display:flex; gap:4px; background:var(--gray-bg); padding:3px; border-radius:8px;}
+  .qtabs button{
+    border:none; background:transparent; padding:6px 12px; border-radius:6px; font-size:12.5px; cursor:pointer; font-family:inherit; color:var(--muted); font-weight:600;
+  }
+  .qtabs button.active{background:var(--primary); color:#fff;}
+  .filterbtns{display:flex; gap:4px;}
+  .filterbtns button{
+    border:1px solid var(--border); background:#fff; padding:6px 12px; border-radius:6px; font-size:12.5px; cursor:pointer; font-family:inherit;
+  }
+  .filterbtns button.active{background:var(--text); color:#fff; border-color:var(--text);}
+  .btn{
+    border:none; background:var(--primary); color:#fff; padding:7px 14px; border-radius:6px; font-size:13px; cursor:pointer; font-weight:600; font-family:inherit;
+  }
+  .btn:hover{background:var(--primary-dark);}
+  .btn.secondary{background:#fff; color:var(--text); border:1px solid var(--border);}
+  .btn.secondary:hover{background:var(--gray-bg);}
+  .btn.small{padding:4px 10px; font-size:12px;}
+  .spacer{flex:1;}
+
+  .layout{display:grid; grid-template-columns:1fr 320px; gap:16px; align-items:start;}
+  @media (max-width:1100px){ .layout{grid-template-columns:1fr;} }
+
+  .panel{background:var(--panel); border:1px solid var(--border); border-radius:10px; box-shadow:var(--shadow); overflow:hidden;}
+  table{width:100%; border-collapse:collapse; font-size:12.8px;}
+  thead th{
+    background:#f9fafb; text-align:left; padding:9px 8px; border-bottom:1px solid var(--border);
+    font-weight:600; color:#374151; white-space:nowrap; position:sticky; top:57px;
+  }
+  tbody td{padding:8px; border-bottom:1px solid #f1f2f4; vertical-align:middle;}
+  tbody tr:hover{background:#fafbfc;}
+  td.num, th.num{text-align:right;}
+  .code{font-weight:700; color:var(--primary);}
+  .name{color:#374151;}
+  .editable{
+    width:70px; padding:4px 6px; border:1px solid transparent; border-radius:5px; text-align:right; font-family:inherit; font-size:12.8px;
+    background:transparent;
+  }
+  .editable:hover{border-color:var(--border); background:#fff;}
+  .editable:focus{border-color:var(--primary); background:#fff; outline:none;}
+  .badge{
+    display:inline-block; padding:3px 9px; border-radius:999px; font-size:11.5px; font-weight:700; white-space:nowrap;
+  }
+  .badge.need{background:var(--red-bg); color:var(--red);}
+  .badge.requested{background:var(--amber-bg); color:var(--amber);}
+  .badge.ordered{background:var(--blue-bg); color:var(--primary);}
+  .badge.received{background:var(--green-bg); color:var(--green);}
+  .months-tag{font-weight:700;}
+  .months-tag.danger{color:var(--red);}
+  .months-tag.warn{color:var(--amber);}
+  .months-tag.ok{color:var(--green);}
+  .manage-btn{
+    border:1px solid var(--border); background:#fff; padding:5px 10px; border-radius:6px; font-size:12px; cursor:pointer; font-family:inherit;
+  }
+  .manage-btn:hover{background:var(--gray-bg);}
+
+  .sidebar h3{font-size:14px; margin:0; padding:12px 14px; border-bottom:1px solid var(--border);}
+  #activityFeed{max-height:640px; overflow-y:auto; padding:6px 0;}
+  .activity-item{padding:9px 14px; border-bottom:1px solid #f5f5f6; font-size:12.5px; line-height:1.5;}
+  .activity-item b{color:var(--text);}
+  .activity-item .dept-tag{
+    display:inline-block; font-size:10.5px; font-weight:700; padding:1px 6px; border-radius:4px; margin-right:5px;
+  }
+  .dept-planning{background:#ede9fe; color:#6d28d9;}
+  .dept-purchasing{background:var(--blue-bg); color:var(--primary);}
+  .dept-warehouse{background:var(--green-bg); color:var(--green);}
+  .activity-item .time{color:var(--muted); font-size:11px;}
+  .empty-hint{padding:30px 14px; text-align:center; color:var(--muted); font-size:13px;}
+
+  .modal-backdrop{
+    display:none; position:fixed; inset:0; background:rgba(15,23,42,0.5); z-index:200; align-items:center; justify-content:center; padding:20px;
+  }
+  .modal-backdrop.show{display:flex;}
+  .modal{background:#fff; border-radius:12px; width:100%; max-width:520px; max-height:88vh; overflow-y:auto; box-shadow:0 20px 50px rgba(0,0,0,0.25);}
+  .modal-head{padding:16px 20px; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:flex-start;}
+  .modal-head h2{font-size:16px; margin:0;}
+  .modal-head .sub{font-size:12px; color:var(--muted); margin-top:3px;}
+  .modal-close{background:none; border:none; font-size:20px; cursor:pointer; color:var(--muted); line-height:1;}
+  .modal-body{padding:16px 20px;}
+  .modal-body .stepper{display:flex; align-items:center; gap:4px; margin-bottom:16px; flex-wrap:wrap;}
+  .step{
+    flex:1; min-width:70px; text-align:center; padding:8px 4px; border-radius:8px; font-size:11.5px; font-weight:700; background:var(--gray-bg); color:var(--muted);
+  }
+  .step.done{background:var(--green-bg); color:var(--green);}
+  .step.current{background:var(--amber-bg); color:var(--amber);}
+  .field-row{margin-bottom:12px;}
+  .field-row label{display:block; font-size:12px; color:var(--muted); margin-bottom:4px; font-weight:600;}
+  .field-row input, .field-row textarea{
+    width:100%; padding:8px 10px; border:1px solid var(--border); border-radius:6px; font-size:13.5px; font-family:inherit;
+  }
+  .info-grid{display:grid; grid-template-columns:1fr 1fr; gap:8px 16px; margin-bottom:16px; font-size:13px;}
+  .info-grid div span{display:block; color:var(--muted); font-size:11.5px;}
+  .action-log{background:var(--gray-bg); border-radius:8px; padding:10px 12px; font-size:12px; margin-bottom:14px; max-height:140px; overflow-y:auto;}
+  .action-log .row{padding:4px 0; border-bottom:1px dashed #e5e7eb;}
+  .action-log .row:last-child{border-bottom:none;}
+  .modal-actions{display:flex; gap:8px; justify-content:flex-end; padding-top:6px;}
+  .setup-banner{
+    background:#fff7ed; border:1px solid #fed7aa; color:#9a3412; padding:12px 16px; border-radius:10px; margin-bottom:14px; font-size:13px; line-height:1.6;
+  }
+  .setup-banner b{color:#7c2d12;}
+  .hidden{display:none !important;}
+  footer{text-align:center; color:var(--muted); font-size:11.5px; padding:20px;}
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>ระบบวางแผน–จัดซื้อ–คลังอะไหล่</h1>
+    <div class="sub">Forecast &amp; Order Tracking · เชื่อม Planning / จัดซื้อ / คลังอะไหล่ ให้เห็นข้อมูลเดียวกันแบบเรียลไทม์</div>
+  </div>
+  <div style="display:flex; align-items:center; gap:14px; flex-wrap:wrap;">
+    <span id="connStatus" class="status-pill"><span class="dot"></span> กำลังเชื่อมต่อ...</span>
+    <div class="role-box">
+      <input type="text" id="userName" placeholder="ชื่อของคุณ" style="width:110px;">
+      <select id="userDept">
+        <option value="planning">Planning</option>
+        <option value="purchasing">จัดซื้อ</option>
+        <option value="warehouse">คลังอะไหล่</option>
+      </select>
+    </div>
+  </div>
+</header>
+
+<main>
+
+  <div id="setupBanner" class="setup-banner hidden">
+    <b>ยังไม่ได้เชื่อมต่อฐานข้อมูล</b><br>
+    กรุณาใส่ค่า Firebase config ในไฟล์ index.html (ค้นหาคำว่า "แก้ตรงนี้") ตามคู่มือติดตั้งที่แนบมา แล้วเปิดหน้านี้ใหม่อีกครั้ง
+  </div>
+
+  <div class="cards">
+    <div class="card"><div class="num" id="cardTotal">–</div><div class="label">รายการอะไหล่ทั้งหมด</div></div>
+    <div class="card urgent"><div class="num" id="cardUrgent">–</div><div class="label">สต๊อกใช้ได้ &lt; 3 เดือน (เร่งด่วน)</div></div>
+    <div class="card pending"><div class="num" id="cardPending">–</div><div class="label">รายการยังไม่ปิดงานไตรมาสนี้</div></div>
+    <div class="card ok"><div class="num" id="cardReceived">–</div><div class="label">รับของครบไตรมาสนี้แล้ว</div></div>
+  </div>
+
+  <div class="toolbar">
+    <div class="qtabs" id="qtabs">
+      <button data-q="q3" class="active">Q3/69 (ก.ค.-ก.ย.)</button>
+      <button data-q="q4">Q4/69 (ต.ค.-ธ.ค.)</button>
+      <button data-q="q1">Q1/70 (ม.ค.-มี.ค.)</button>
+      <button data-q="q2">Q2/70 (เม.ย.-มิ.ย.)</button>
+    </div>
+    <div class="filterbtns" id="filterbtns">
+      <button data-f="all" class="active">ทั้งหมด</button>
+      <button data-f="urgent">เร่งด่วน</button>
+      <button data-f="pending">ต้องดำเนินการ</button>
+    </div>
+    <input type="text" id="searchBox" placeholder="ค้นหารหัส / ชื่ออะไหล่...">
+    <div class="spacer"></div>
+    <button class="btn secondary small" id="btnSeed">โหลดข้อมูลเริ่มต้น (97 รายการ)</button>
+    <label class="btn secondary small" style="cursor:pointer;">
+      นำเข้า/อัปเดตจาก Excel
+      <input type="file" id="fileImport" accept=".xlsx,.xls" class="hidden">
+    </label>
+  </div>
+
+  <div class="layout">
+    <div class="panel">
+      <table>
+        <thead>
+          <tr>
+            <th>รหัส / รายการ</th>
+            <th class="num">สต๊อก</th>
+            <th class="num">ค้างส่ง</th>
+            <th class="num">MOQ</th>
+            <th class="num">ใช้ได้อีก (ด.)</th>
+            <th class="num">Forecast ไตรมาส</th>
+            <th class="num">แนะนำสั่ง</th>
+            <th>สถานะ</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="tableBody">
+          <tr><td colspan="9" class="empty-hint">กำลังโหลดข้อมูล...</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="panel sidebar">
+      <h3>กิจกรรมล่าสุด (Real-time)</h3>
+      <div id="activityFeed"><div class="empty-hint">ยังไม่มีความเคลื่อนไหว</div></div>
+    </div>
+  </div>
+
+</main>
+
+<footer>Internal tool · ข้อมูลซิงก์ผ่าน Firebase Firestore แบบเรียลไทม์</footer>
+
+<!-- Modal -->
+<div class="modal-backdrop" id="modalBackdrop">
+  <div class="modal">
+    <div class="modal-head">
+      <div>
+        <h2 id="modalTitle">-</h2>
+        <div class="sub" id="modalSub">-</div>
+      </div>
+      <button class="modal-close" id="modalClose">&times;</button>
+    </div>
+    <div class="modal-body" id="modalBody"></div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script type="module">
+/* ============================================================
+   แก้ตรงนี้: ใส่ Firebase config ของคุณเอง (ดูวิธีในคู่มือติดตั้ง)
+   ============================================================ */
+const firebaseConfig = {
+  apiKey: "AIzaSyBLLMg8Q8fGbdZS3rx96aXmsF1tnG0ON9w",
+  authDomain: "cmt-forcast-dd3c8.firebaseapp.com",
+  projectId: "cmt-forcast-dd3c8",
+  storageBucket: "cmt-forcast-dd3c8.firebasestorage.app",
+  messagingSenderId: "921925066502",
+  appId: "1:921925066502:web:f99222c990064861778887"
+};
+/* ============================================================ */
+
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import {
+  getFirestore, collection, doc, setDoc, updateDoc, onSnapshot,
+  addDoc, serverTimestamp, query, orderBy, limit, writeBatch, getDoc
+} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+
+const QUARTERS = [
+  {key:'q3', label:'Q3/69 (ก.ค.-ก.ย.)'},
+  {key:'q4', label:'Q4/69 (ต.ค.-ธ.ค.)'},
+  {key:'q1', label:'Q1/70 (ม.ค.-มี.ค.)'},
+  {key:'q2', label:'Q2/70 (เม.ย.-มิ.ย.)'}
+];
+const STATUS_FLOW = ['need','requested','ordered','received'];
+const STATUS_LABEL = {need:'ต้องสั่ง', requested:'ขอซื้อแล้ว', ordered:'สั่งซื้อแล้ว', received:'รับของแล้ว'};
+const DEPT_LABEL = {planning:'Planning', purchasing:'จัดซื้อ', warehouse:'คลังอะไหล่'};
+
+// ---------- ข้อมูลเริ่มต้นจากไฟล์ Forcast proten.xlsx (97 รายการ) ----------
+const SEED_DATA = [
+  {
+    "seq": 1,
+    "code": "DT17",
+    "name": "ใบปาดดินพร้อมขา",
+    "qtyPerSet": 7,
+    "stock": 1161,
+    "pending": 1026,
+    "totalStock": 2187,
+    "monthsRemaining": 1.8,
+    "moq": 50,
+    "forecast": {
+      "q3": 3621,
+      "q4": 2430,
+      "q1": 4645,
+      "q2": 4091,
+      "total": 14787
+    },
+    "orderQty": {
+      "q3": 1450,
+      "q4": 2450,
+      "q1": 4650,
+      "q2": 4050,
+      "total": 12600
+    },
+    "stockAfter": {
+      "q3": 16,
+      "q4": 36,
+      "q1": 41,
+      "q2": 0
+    },
+    "productionCapacity": 312
+  },
+  {
+    "seq": 2,
+    "code": "DT134",
+    "name": "แผ่นปะกับราวใบปาดดิน 2 รู",
+    "qtyPerSet": 7,
+    "stock": 4000,
+    "pending": 0,
+    "totalStock": 4000,
+    "monthsRemaining": 4.8,
+    "moq": 50,
+    "forecast": {
+      "q3": 1000,
+      "q4": 3000,
+      "q1": 1000,
+      "q2": 4950,
+      "total": 9950
+    },
+    "orderQty": {
+      "q3": 0,
+      "q4": 0,
+      "q1": 1000,
+      "q2": 4950,
+      "total": 5950
+    },
+    "stockAfter": {
+      "q3": 3000,
+      "q4": 0,
+      "q1": 0,
+      "q2": 0
+    },
+    "productionCapacity": 571
+  },
+  {
+    "seq": 3,
+    "code": "DT185",
+    "name": "แผ่นประกับราวใบปาดดิน 1 รู",
+    "qtyPerSet": 4,
+    "stock": 1300,
+    "pending": 0,
+    "totalStock": 1300,
+    "monthsRemaining": 3.4,
+    "moq": 50,
+    "forecast": {
+      "q3": 0,
+      "q4": 600,
+      "q1": 0,
+      "q2": 4000,
+      "total": 4600
+    },
+    "orderQty": {
+      "q3": 0,
+      "q4": 0,
+      "q1": 0,
+      "q2": 3300,
+      "total": 3300
+    },
+    "stockAfter": {
+      "q3": 1300,
+      "q4": 700,
+      "q1": 700,
+      "q2": 0
+    },
+    "productionCapacity": 325
+  },
+  {
+    "seq": 4,
+    "code": "DT662-A",
+    "name": "บู๊ชครอบหัวสปริงรู22มม.",
+    "qtyPerSet": 2,
+    "stock": 403,
+    "pending": 597,
+    "totalStock": 1000,
+    "monthsRemaining": 4,
+    "moq": 50,
+    "forecast": {
+      "q3": 1000,
+      "q4": 1000,
+      "q1": 0,
+      "q2": 1000,
+      "total": 3000
+    },
+    "orderQty": {
+      "q3": 0,
+      "q4": 1000,
+      "q1": 0,
+      "q2": 1000,
+      "total": 2000
+    },
+    "stockAfter": {
+      "q3": 0,
+      "q4": 0,
+      "q1": 0,
+      "q2": 0
+    },
+    "productionCapacity": 500
+  },
+  {
+    "seq": 5,
+    "code": "DT10502",
+    "name": "ลูกระนาดไถนา",
+    "qtyPerSet": 4,
+    "stock": 1160,
+    "pending": 0,
+    "totalStock": 1160,
+    "monthsRemaining": 5.1,
+    "moq": 50,
+    "forecast": {
+      "q3": 550,
+      "q4": 118,
+      "q1": 980,
+      "q2": 1076,
+      "total": 2724
+    },
+    "orderQty": {
+      "q3": 0,
+      "q4": 0,
+      "q1": 500,
+      "q2": 1100,
+      "total": 1600
+    },
+    "stockAfter": {
+      "q3": 610,
+      "q4": 492,
+      "q1": 12,
+      "q2": 36
+    },
+    "productionCapacity": 290
+  },
+  {
+    "seq": 6,
+    "code": "DT120B",
+    "name": "เหล็กขาถ้วยขาตั้งโครง DT",
+    "qtyPerSet": 1,
+    "stock": 0,
+    "pending": 500,
+    "totalStock": 500,
+    "monthsRemaining": 2.2,
+    "moq": 50,
+    "forecast": {
+      "q3": 750,
+      "q4": 450,
+      "q1": 1000,
+      "q2": 500,
+      "total": 2700
+    },
+    "orderQty": {
+      "q3": 250,
+      "q4": 450,
+      "q1": 1000,
+      "q2": 500,
+      "total": 2200
+    },
+    "stockAfter": {
+      "q3": 0,
+      "q4": 0,
+      "q1": 0,
+      "q2": 0
+    },
+    "productionCapacity": 500
+  },
+  {
+    "seq": 7,
+    "code": "DT334",
+    "name": "ลูกระนาดยึดราวใบปาดไถ 7",
+    "qtyPerSet": 5,
+    "stock": 500,
+    "pending": 300,
+    "totalStock": 800,
+    "monthsRemaining": 3.6,
+    "moq": 50,
+    "forecast": {
+      "q3": 510,
+      "q4": 410,
+      "q1": 1000,
+      "q2": 770,
+      "total": 2690
+    },
+    "orderQty": {
+      "q3": 0,
+      "q4": 150,
+      "q1": 1000,
+      "q2": 750,
+      "total": 1900
+    },
+    "stockAfter": {
+      "q3": 290,
+      "q4": 30,
+      "q1": 30,
+      "q2": 10
+    },
+    "productionCapacity": 160
+  },
+  {
+    "seq": 8,
+    "code": "DT745-A",
+    "name": "บูชครอบหัวสปริงรู 28มม. DT745",
+    "qtyPerSet": 2,
+    "stock": 0,
+    "pending": 1000,
+    "totalStock": 1000,
+    "monthsRemaining": 4.8,
+    "moq": 50,
+    "forecast": {
+      "q3": 0,
+      "q4": 1000,
+      "q1": 500,
+      "q2": 1000,
+      "total": 2500
+    },
+    "orderQty": {
+      "q3": 0,
+      "q4": 0,
+      "q1": 500,
+      "q2": 1000,
+      "total": 1500
+    },
+    "stockAfter": {
+      "q3": 1000,
+      "q4": 0,
+      "q1": 0,
+      "q2": 0
+    },
+    "productionCapacity": 500
+  },
+  {
+    "seq": 9,
+    "code": "DT324",
+    "name": "เหล็กดามยันเพลาไถนา",
+    "qtyPerSet": 3,
+    "stock": 0,
+    "pending": 0,
+    "totalStock": 0,
+    "monthsRemaining": 0,
+    "moq": 50,
+    "forecast": {
+      "q3": 300,
+      "q4": 300,
+      "q1": 1000,
+      "q2": 900,
+      "total": 2500
+    },
+    "orderQty": {
+      "q3": 300,
+      "q4": 300,
+      "q1": 1000,
+      "q2": 900,
+      "total": 2500
+    },
+    "stockAfter": {
+      "q3": 0,
+      "q4": 0,
+      "q1": 0,
+      "q2": 0
+    },
+    "productionCapacity": 0
+  },
+  {
+    "seq": 10,
+    "code": "DR14433",
+    "name": "เหล็กปาดดินล้อหางใหญ่",
+    "qtyPerSet": 1,
+    "stock": 569,
+    "pending": 0,
+    "totalStock": 569,
+    "monthsRemaining": 3.3,
+    "moq": 50,
+    "forecast": {
+      "q3": 400,
+      "q4": 510,
+      "q1": 500,
+      "q2": 660,
+      "total": 2070
+    },
+    "orderQty": {
+      "q3": 0,
+      "q4": 350,
+      "q1": 500,
+      "q2": 700,
+      "total": 1550
+    },
+    "stockAfter": {
+      "q3": 169,
+      "q4": 9,
+      "q1": 9,
+      "q2": 49
+    },
+    "productionCapacity": 569
+  },
+  {
+    "seq": 11,
+    "code": "DT327",
+    "name": "เหล็กติดเพลาล้อหาง DT327",
+    "qtyPerSet": 1,
+    "stock": 232,
+    "pending": 0,
+    "totalStock": 232,
+    "monthsRemaining": 1.3,
+    "moq": 50,
+    "forecast": {
+      "q3": 370,
+      "q4": 350,
+      "q1": 627,
+      "q2": 719,
+      "total": 2066
+    },
+    "orderQty": {
+      "q3": 150,
+      "q4": 350,
+      "q1": 650,
+      "q2": 700,
+      "total": 1850
+    },
+    "stockAfter": {
+      "q3": 12,
+      "q4": 12,
+      "q1": 35,
+      "q2": 16
+    },
+    "productionCapacity": 232
+  },
+  {
+    "seq": 12,
+    "code": "DT2060C",
+    "name": "ฝาครอบแป๊ปไถนา 6 จาน DT2060C",
+    "qtyPerSet": 1,
+    "stock": 300,
+    "pending": 0,
+    "totalStock": 300,
+    "monthsRemaining": 1.9,
+    "moq": 50,
+    "forecast": {
+      "q3": 300,
+      "q4": 360,
+      "q1": 600,
+      "q2": 600,
+      "total": 1860
+    },
+    "orderQty": {
+      "q3": 0,
+      "q4": 400,
+      "q1": 600,
+      "q2": 600,
+      "total": 1600
+    },
+    "stockAfter": {
+      "q3": 0,
+      "q4": 40,
+      "q1": 40,
+      "q2": 40
+    },
+    "productionCapacity": 300
+  },
+  {
+    "seq": 13,
+    "code": "PBA45697B",
+    "name": "ฝาครอบเพลาล้อหาง 7 จาน PBA45697",
+    "qtyPerSet": 1,
+    "stock": 297,
+    "pending": 0,
+    "totalStock": 297,
+    "monthsRemaining": 2,
+    "moq": 50,
+    "forecast": {
+      "q3": 200,
+      "q4": 350,
+      "q1": 520,
+      "q2": 710,
+      "total": 1780
+    },
+    "orderQty": {
+      "q3": 0,
+      "q4": 300,
+      "q1": 500,
+      "q2": 700,
+      "total": 1500
+    },
+    "stockAfter": {
+      "q3": 97,
+      "q4": 47,
+      "q1": 27,
+      "q2": 17
+    },
+    "productionCapacity": 297
+  },
+  {
+    "seq": 14,
+    "code": "DT320A",
+    "name": "ฝาครอบแป๊ปไถนา 7 จาน",
+    "qtyPerSet": 2,
+    "stock": 0,
+    "pending": 351,
+    "totalStock": 351,
+    "monthsRemaining": 2.5,
+    "moq": 50,
+    "forecast": {
+      "q3": 400,
+      "q4": 314,
+      "q1": 600,
+      "q2": 400,
+      "total": 1714
+    },
+    "orderQty": {
+      "q3": 50,
+      "q4": 350,
+      "q1": 600,
+      "q2": 400,
+      "total": 1400
+    },
+    "stockAfter": {
+      "q3": 1,
+      "q4": 37,
+      "q1": 37,
+      "q2": 37
+    },
+    "productionCapacity": 175
+  },
+  {
+    "seq": 15,
+    "code": "DT323",
+    "name": "เหล็กยึดคานไถนา",
+    "qtyPerSet": 2,
+    "stock": 400,
+    "pending": 0,
+    "totalStock": 400,
+    "monthsRemaining": 2.8,
+    "moq": 50,
+    "forecast": {
+      "q3": 300,
+      "q4": 410,
+      "q1": 600,
+      "q2": 400,
+      "total": 1710
+    },
+    "orderQty": {
+      "q3": 0,
+      "q4": 350,
+      "q1": 600,
+      "q2": 400,
+      "total": 1350
+    },
+    "stockAfter": {
+      "q3": 100,
+      "q4": 40,
+      "q1": 40,
+      "q2": 40
+    },
+    "productionCapacity": 200
+  },
+  {
+    "seq": 16,
+    "code": "DT20608",
+    "name": "เหล็กสามเหลี่ยมดามโครงไถนา",
+    "qtyPerSet": 2,
+    "stock": 0,
+    "pending": 2,
+    "totalStock": 2,
+    "monthsRemaining": 0,
+    "moq": 50,
+    "forecast": {
+      "q3": 300,
+      "q4": 390,
+      "q1": 340,
+      "q2": 630,
+      "total": 1660
+    },
+    "orderQty": {
+      "q3": 300,
+      "q4": 400,
+      "q1": 350,
+      "q2": 650,
+      "total": 1700
+    },
+    "stockAfter": {
+      "q3": 2,
+      "q4": 12,
+      "q1": 22,
+      "q2": 42
+    },
+    "productionCapacity": 1
+  },
+  {
+    "seq": 17,
+    "code": "DT333",
+    "name": "เหล็กสามเหลี่ยมดามซองเอเฟรม 7",
+    "qtyPerSet": 1,
+    "stock": 0,
+    "pending": 400,
+    "totalStock": 400,
+    "monthsRemaining": 2.9,
+    "moq": 50,
+    "forecast": {
+      "q3": 400,
+      "q4": 319,
+      "q1": 530,
+      "q2": 400,
+      "total": 1649
+    },
+    "orderQty": {
+      "q3": 0,
+      "q4": 350,
+      "q1": 500,
+      "q2": 400,
+      "total": 1250
+    },
+    "stockAfter": {
+      "q3": 0,
+      "q4": 31,
+      "q1": 1,
+      "q2": 1
+    },
+    "productionCapacity": 400
+  },
+  {
+    "seq": 18,
+    "code": "DT767-A",
+    "name": "แหวนรองเพลาล้อหาง",
+    "qtyPerSet": 1,
+    "stock": 372,
+    "pending": 0,
+    "totalStock": 372,
+    "monthsRemaining": 3.4,
+    "moq": 50,
+    "forecast": {
+      "q3": 200,
+      "q4": 396,
+      "q1": 220,
+      "q2": 500,
+      "total": 1316
+    },
+    "orderQty": {
+      "q3": 0,
+      "q4": 250,
+      "q1": 200,
+      "q2": 500,
+      "total": 950
+    },
+    "stockAfter": {
+      "q3": 172,
+      "q4": 26,
+      "q1": 6,
+      "q2": 6
+    },
+    "productionCapacity": 372
+  },
+  {
+    "seq": 19,
+    "code": "M2060-1501",
+    "name": "ขาซองเอเฟรมไถ 5",
+    "qtyPerSet": 1,
+    "stock": 342,
+    "pending": 0,
+    "totalStock": 342,
+    "monthsRemaining": 3.1,
+    "moq": 50,
+    "forecast": {
+      "q3": 457,
+      "q4": 0,
+      "q1": 560,
+      "q2": 290,
+      "total": 1307
+    },
+    "orderQty": {
+      "q3": 150,
+      "q4": 0,
+      "q1": 550,
+      "q2": 300,
+      "total": 1000
+    },
+    "stockAfter": {
+      "q3": 35,
+      "q4": 35,
+      "q1": 25,
+      "q2": 35
+    },
+    "productionCapacity": 342
+  },
+  {
+    "seq": 20,
+    "code": "DT52060",
+    "name": "ฝาครอบเพลาล้อหาง 6 จาน",
+    "qtyPerSet": 1,
+    "stock": 320,
+    "pending": 0,
+    "totalStock": 320,
+    "monthsRemaining": 3,
+    "moq": 50,
+    "forecast": {
+      "q3": 0,
+      "q4": 409,
+      "q1": 150,
+      "q2": 710,
+      "total": 1269
+    },
+    "orderQty": {
+      "q3": 0,
+      "q4": 100,
+      "q1": 150,
+      "q2": 700,
+      "total": 950
+    },
+    "stockAfter": {
+      "q3": 320,
+      "q4": 11,
+      "q1": 11,
+      "q2": 1
+    },
+    "productionCapacity": 320
+  },
+  {
+    "seq": 21,
+    "code": "DT323-A",
+    "name": "เหล็กติดเพลาล้อหางไถ 6",
+    "qtyPerSet": 1,
+    "stock": 0,
+    "pending": 0,
+    "totalStock": 0,
+    "monthsRemaining": 0,
+    "moq": 50,
+    "forecast": {
+      "q3": 0,
+      "q4": 150,
+      "q1": 340,
+      "q2": 650,
+      "total": 1140
+    },
+    "orderQty": {
+      "q3": 0,
+      "q4": 150,
+      "q1": 350,
+      "q2": 650,
+      "total": 1150
+    },
+    "stockAfter": {
+      "q3": 0,
+      "q4": 0,
+      "q1": 10,
+      "q2": 10
+    },
+    "productionCapacity": 0
+  },
+  {
+    "seq": 22,
+    "code": "DT322",
+    "name": "เหล็กปิดหน้าซองเอเฟรมไถนา 7 จาน",
+    "qtyPerSet": 1,
+    "stock": 228,
+    "pending": 300,
+    "totalStock": 528,
+    "monthsRemaining": 5.8,
+    "moq": 50,
+    "forecast": {
+      "q3": 200,
+      "q4": 300,
+      "q1": 400,
+      "q2": 200,
+      "total": 1100
+    },
+    "orderQty": {
+      "q3": 0,
+      "q4": 0,
+      "q1": 400,
+      "q2": 200,
+      "total": 600
+    },
+    "stockAfter": {
+      "q3": 328,
+      "q4": 28,
+      "q1": 28,
+      "q2": 28
+    },
+    "productionCapacity": 528
+  },
+  {
+    "seq": 23,
+    "code": "DH03",
+    "name": "บู๊ชสลักร้อยสปริงไถ 6",
+    "qtyPerSet": 1,
+    "stock": 270,
+    "pending": 0,
+    "totalStock": 270,
+    "monthsRemaining": 3.1,
+    "moq": 50,
+    "forecast": {
+      "q3": 0,
+      "q4": 53,
+      "q1": 200,
+      "q2": 800,
+      "total": 1053
+    },
+    "orderQty": {
+      "q3": 0,
+      "q4": 0,
+      "q1": 0,
+      "q2": 800,
+      "total": 800
+    },
+    "stockAfter": {
+      "q3": 270,
+      "q4": 217,
+      "q1": 17,
+      "q2": 17
+    },
+    "productionCapacity": 270
+  },
+  {
+    "seq": 24,
+    "code": "DT331",
+    "name": "เหล็กดามแผ่นท้ายไถนาDT331",
+    "qtyPerSet": 1,
+    "stock": 0,
+    "pending": 224,
+    "totalStock": 224,
+    "monthsRemaining": 2.6,
+    "moq": 50,
+    "forecast": {
+      "q3": 240,
+      "q4": 200,
+      "q1": 370,
+      "q2": 210,
+      "total": 1020
+    },
+    "orderQty": {
+      "q3": 50,
+      "q4": 200,
+      "q1": 350,
+      "q2": 200,
+      "total": 800
+    },
+    "stockAfter": {
+      "q3": 34,
+      "q4": 34,
+      "q1": 14,
+      "q2": 4
+    },
+    "productionCapacity": 224
+  },
+  {
+    "seq": 25,
+    "code": "DT751-A",
+    "name": "ปะแจไถนา 7 จาน 1 หัวตรงล้อหาง",
+    "qtyPerSet": 1,
+    "stock": 550,
+    "pending": 0,
+    "totalStock": 550,
+    "monthsRemaining": 6.7,
+    "moq": 50,
+    "forecast": {
+      "q3": 200,
+      "q4": 0,
+      "q1": 300,
+      "q2": 490,
+      "total": 990
+    },
+    "orderQty": {
+      "q3": 0,
+      "q4": 0,
+      "q1": 0,
+      "q2": 450,
+      "total": 450
+    },
+    "stockAfter": {
+      "q3": 350,
+      "q4": 350,
+      "q1": 50,
+      "q2": 10
+    },
+    "productionCapacity": 550
+  },
+  {
+    "seq": 26,
+    "code": "DT325B",
+    "name": "เหล็กดามไส้ตัวยูโครงไถนา 7 จาน DT325B",
+    "qtyPerSet": 1,
+    "stock": 351,
+    "pending": 200,
+    "totalStock": 551,
+    "monthsRemaining": 6.7,
+    "moq": 50,
+    "forecast": {
+      "q3": 160,
+      "q4": 275,
+      "q1": 300,
+      "q2": 250,
+      "total": 985
+    },
+    "orderQty": {
+      "q3": 0,
+      "q4": 0,
+      "q1": 200,
+      "q2": 250,
+      "total": 450
+    },
+    "stockAfter": {
+      "q3": 391,
+      "q4": 116,
+      "q1": 16,
+      "q2": 16
+    },
+    "productionCapacity": 551
+  },
+  {
+    "seq": 27,
+    "code": "DT752-A",
+    "name": "ประแจขันฝาปิดก้ามปูไถนา",
+    "qtyPerSet": 1,
+    "stock": 0,
+    "pending": 200,
+    "totalStock": 200,
+    "monthsRemaining": 2.4,
+    "moq": 50,
+    "forecast": {
+      "q3": 200,
+      "q4": 193,
+      "q1": 390,
+      "q2": 200,
+      "total": 983
+    },
+    "orderQty": {
+      "q3": 0,
+      "q4": 200,
+      "q1": 400,
+      "q2": 200,
+      "total": 800
+    },
+    "stockAfter": {
+      "q3": 0,
+      "q4": 7,
+      "q1": 17,
+      "q2": 17
+    },
+    "productionCapacity": 200
+  },
+  {
+    "seq": 28,
+    "code": "DT20602",
+    "name": "เหล็กติดหูยกไถนา6 จานเล็ก",
+    "qtyPerSet": 1,
+    "stock": 176,
+    "pending": 0,
+    "totalStock": 176,
+    "monthsRemaining": 2.3,
+    "moq": 50,
+    "forecast": {
+      "q3": 155,
+      "q4": 214,
+      "q1": 330,
+      "q2": 234,
+      "total": 933
+    },
+    "orderQty": {
+      "q3": 0,
+      "q4": 200,
+      "q1": 350,
+      "q2": 250,
+      "total": 800
+    },
+    "stockAfter": {
+      "q3": 21,
+      "q4": 7,
+      "q1": 27,
+      "q2": 43
+    },
+    "productionCapacity": 176
+  },
+  {
+    "seq": 29,
+    "code": "DT325A",
+    "name": "เหล็กตัวยูติดโครงไถนา 7 จาน DT325A",
+    "qtyPerSet": 1,
+    "stock": 52,
+    "pending": 196,
+    "totalStock": 248,
+    "monthsRemaining": 3.2,
+    "moq": 50,
+    "forecast": {
+      "q3": 160,
+      "q4": 214,
+      "q1": 300,
+      "q2": 250,
+      "total": 924
+    },
+    "orderQty": {
+      "q3": 0,
+      "q4": 150,
+      "q1": 300,
+      "q2": 250,
+      "total": 700
+    },
+    "stockAfter": {
+      "q3": 88,
+      "q4": 24,
+      "q1": 24,
+      "q2": 24
+    },
+    "productionCapacity": 248
+  },
+  {
+    "seq": 30,
+    "code": "DT2060",
+    "name": "เหล็กตัวยูติดโครงไถนา6จาน",
+    "qtyPerSet": 1,
+    "stock": 200,
+    "pending": 0,
+    "totalStock": 200,
+    "monthsRemaining": 2.6,
+    "moq": 50,
+    "forecast": {
+      "q3": 248,
+      "q4": 159,
+      "q1": 311,
+      "q2": 201,
+      "total": 919
+    },
+    "orderQty": {
+      "q3": 50,
+      "q4": 200,
+      "q1": 300,
+      "q2": 200,
+      "total": 750
+    },
+    "stockAfter": {
+      "q3": 2,
+      "q4": 43,
+      "q1": 32,
+      "q2": 31
+    },
+    "productionCapacity": 200
+  },
+  {
+    "seq": 31,
+    "code": "DT20606",
+    "name": "เหล็กดามโคนเอเฟรมไถนา 2060",
+    "qtyPerSet": 1,
+    "stock": 114,
+    "pending": 0,
+    "totalStock": 114,
+    "monthsRemaining": 1.5,
+    "moq": 50,
+    "forecast": {
+      "q3": 150,
+      "q4": 125,
+      "q1": 260,
+      "q2": 370,
+      "total": 905
+    },
+    "orderQty": {
+      "q3": 50,
+      "q4": 150,
+      "q1": 250,
+      "q2": 350,
+      "total": 800
+    },
+    "stockAfter": {
+      "q3": 14,
+      "q4": 39,
+      "q1": 29,
+      "q2": 9
+    },
+    "productionCapacity": 114
+  },
+  {
+    "seq": 32,
+    "code": "DT330",
+    "name": "เหล็กดามในซองเอเฟรมDT330",
+    "qtyPerSet": 1,
+    "stock": 553,
+    "pending": 124,
+    "totalStock": 677,
+    "monthsRemaining": 9,
+    "moq": 50,
+    "forecast": {
+      "q3": 200,
+      "q4": 100,
+      "q1": 280,
+      "q2": 320,
+      "total": 900
+    },
+    "orderQty": {
+      "q3": 0,
+      "q4": 0,
+      "q1": 0,
+      "q2": 250,
+      "total": 250
+    },
+    "stockAfter": {
+      "q3": 477,
+      "q4": 377,
+      "q1": 97,
+      "q2": 27
+    },
+    "productionCapacity": 677
+  },
+  {
+    "seq": 33,
+    "code": "DT20603",
+    "name": "เหล็กดามโคนเอเฟรมไถนา 6 จ",
+    "qtyPerSet": 1,
+    "stock": 0,
+    "pending": 0,
+    "totalStock": 0,
+    "monthsRemaining": 0,
+    "moq": 50,
+    "forecast": {
+      "q3": 150,
+      "q4": 100,
+      "q1": 260,
+      "q2": 380,
+      "total": 890
+    },
+    "orderQty": {
+      "q3": 150,
+      "q4": 100,
+      "q1": 300,
+      "q2": 350,
+      "total": 900
+    },
+    "stockAfter": {
+      "q3": 0,
+      "q4": 0,
+      "q1": 40,
+      "q2": 10
+    },
+    "productionCapacity": 0
+  },
+  {
+    "seq": 34,
+    "code": "DT329",
+    "name": "เหล็กดามเอเฟรมไถนา 7 จาน",
+    "qtyPerSet": 1,
+    "stock": 212,
+    "pending": 47,
+    "totalStock": 259,
+    "monthsRemaining": 3.5,
+    "moq": 50,
+    "forecast": {
+      "q3": 160,
+      "q4": 168,
+      "q1": 300,
+      "q2": 250,
+      "total": 878
+    },
+    "orderQty": {
+      "q3": 0,
+      "q4": 100,
+      "q1": 300,
+      "q2": 250,
+      "total": 650
+    },
+    "stockAfter": {
+      "q3": 99,
+      "q4": 31,
+      "q1": 31,
+      "q2": 31
+    },
+    "productionCapacity": 259
+  },
+  {
+    "seq": 35,
+    "code": "PBA1147",
+    "name": "ใบปาดดินไถพรวน",
+    "qtyPerSet": 1,
+    "stock": 119,
+    "pending": 0,
+    "totalStock": 119,
+    "monthsRemaining": 1.6,
+    "moq": 50,
+    "forecast": {
+      "q3": 0,
+      "q4": 0,
+      "q1": 620,
+      "q2": 251,
+      "total": 871
+    },
+    "orderQty": {
+      "q3": 0,
+      "q4": 0,
+      "q1": 550,
+      "q2": 250,
+      "total": 800
+    },
+    "stockAfter": {
+      "q3": 119,
+      "q4": 119,
+      "q1": 49,
+      "q2": 48
+    },
+    "productionCapacity": 119
+  },
+  {
+    "seq": 36,
+    "code": "DT20609",
+    "name": "เหล็กมุมเมอแรงติดโครงไถนา DT20609",
+    "qtyPerSet": 1,
+    "stock": 229,
+    "pending": 71,
+    "totalStock": 300,
+    "monthsRemaining": 4.3,
+    "moq": 50,
+    "forecast": {
+      "q3": 100,
+      "q4": 100,
+      "q1": 300,
+      "q2": 340,
+      "total": 840
+    },
+    "orderQty": {
+      "q3": 0,
+      "q4": 0,
+      "q1": 200,
+      "q2": 350,
+      "total": 550
+    },
+    "stockAfter": {
+      "q3": 200,
+      "q4": 100,
+      "q1": 0,
+      "q2": 10
+    },
+    "productionCapacity": 300
+  },
+  {
+    "seq": 37,
+    "code": "DT321B",
+    "name": "ซองเอเฟรมไถนา 5,6จาน DT321B",
+    "qtyPerSet": 1,
+    "stock": 0,
+    "pending": 46,
+    "totalStock": 46,
+    "monthsRemaining": 0.7,
+    "moq": 50,
+    "forecast": {
+      "q3": 82,
+      "q4": 341,
+      "q1": 106,
+      "q2": 300,
+      "total": 829
+    },
+    "orderQty": {
+      "q3": 50,
+      "q4": 350,
+      "q1": 100,
+      "q2": 300,
+      "total": 800
+    },
+    "stockAfter": {
+      "q3": 14,
+      "q4": 23,
+      "q1": 17,
+      "q2": 17
+    },
+    "productionCapacity": 46
+  },
+  {
+    "seq": 38,
+    "code": "M27-10-1202",
+    "name": "แขนซองเอเฟรม (ขวา)",
+    "qtyPerSet": 1,
+    "stock": 518,
+    "pending": 0,
+    "totalStock": 518,
+    "monthsRemaining": 7.6,
+    "moq": 50,
+    "forecast": {
+      "q3": 288,
+      "q4": 212,
+      "q1": 254,
+      "q2": 59,
+      "total": 813
+    },
+    "orderQty": {
+      "q3": 0,
+      "q4": 0,
+      "q1": 250,
+      "q2": 50,
+      "total": 300
+    },
+    "stockAfter": {
+      "q3": 230,
+      "q4": 18,
+      "q1": 14,
+      "q2": 5
+    },
+    "productionCapacity": 518
+  },
+  {
+    "seq": 39,
+    "code": "DT321A",
+    "name": "ซองเอเฟรมไถนา7 จาน DT321A",
+    "qtyPerSet": 1,
+    "stock": 119,
+    "pending": 196,
+    "totalStock": 315,
+    "monthsRemaining": 4.6,
+    "moq": 50,
+    "forecast": {
+      "q3": 216,
+      "q4": 62,
+      "q1": 285,
+      "q2": 250,
+      "total": 813
+    },
+    "orderQty": {
+      "q3": 0,
+      "q4": 0,
+      "q1": 250,
+      "q2": 250,
+      "total": 500
+    },
+    "stockAfter": {
+      "q3": 99,
+      "q4": 37,
+      "q1": 2,
+      "q2": 2
+    },
+    "productionCapacity": 315
+  },
+  {
+    "seq": 40,
+    "code": "M27-10-1203",
+    "name": "แขนซองเอเฟรม (ซ้าย)",
+    "qtyPerSet": 1,
+    "stock": 518,
+    "pending": 0,
+    "totalStock": 518,
+    "monthsRemaining": 7.7,
+    "moq": 50,
+    "forecast": {
+      "q3": 235,
+      "q4": 132,
+      "q1": 338,
+      "q2": 102,
+      "total": 807
+    },
+    "orderQty": {
+      "q3": 0,
+      "q4": 0,
+      "q1": 200,
+      "q2": 100,
+      "total": 300
+    },
+    "stockAfter": {
+      "q3": 283,
+      "q4": 151,
+      "q1": 13,
+      "q2": 11
+    },
+    "productionCapacity": 518
+  },
+  {
+    "seq": 41,
+    "code": "DT2060B",
+    "name": "เหล็กดามไส้ตัวยูโครงไถนา6",
+    "qtyPerSet": 1,
+    "stock": 300,
+    "pending": 0,
+    "totalStock": 300,
+    "monthsRemaining": 4.5,
+    "moq": 50,
+    "forecast": {
+      "q3": 254,
+      "q4": 100,
+      "q1": 199,
+      "q2": 250,
+      "total": 803
+    },
+    "orderQty": {
+      "q3": 0,
+      "q4": 100,
+      "q1": 200,
+      "q2": 250,
+      "total": 550
+    },
+    "stockAfter": {
+      "q3": 46,
+      "q4": 46,
+      "q1": 47,
+      "q2": 47
+    },
+    "productionCapacity": 300
+  },
+  {
+    "seq": 42,
+    "code": "DT332",
+    "name": "เหล็กยึดเสริมซองเอเฟรม ไถ 7",
+    "qtyPerSet": 1,
+    "stock": 180,
+    "pending": 0,
+    "totalStock": 180,
+    "monthsRemaining": 2.7,
+    "moq": 50,
+    "forecast": {
+      "q3": 195,
+      "q4": 103,
+      "q1": 400,
+      "q2": 100,
+      "total": 798
+    },
+    "orderQty": {
+      "q3": 50,
+      "q4": 100,
+      "q1": 400,
+      "q2": 100,
+      "total": 650
+    },
+    "stockAfter": {
+      "q3": 35,
+      "q4": 32,
+      "q1": 32,
+      "q2": 32
+    },
+    "productionCapacity": 180
+  },
+  {
+    "seq": 43,
+    "code": "DT20506",
+    "name": "ขายึดซองเอเฟรมไถนา รุ่น 2060",
+    "qtyPerSet": 1,
+    "stock": 200,
+    "pending": 0,
+    "totalStock": 200,
+    "monthsRemaining": 3.1,
+    "moq": 50,
+    "forecast": {
+      "q3": 192,
+      "q4": 61,
+      "q1": 142,
+      "q2": 386,
+      "total": 781
+    },
+    "orderQty": {
+      "q3": 0,
+      "q4": 100,
+      "q1": 100,
+      "q2": 400,
+      "total": 600
+    },
+    "stockAfter": {
+      "q3": 8,
+      "q4": 47,
+      "q1": 5,
+      "q2": 19
+    },
+    "productionCapacity": 200
+  },
+  {
+    "seq": 44,
+    "code": "DT20605",
+    "name": "เหล็กดามซอง-ใหญ่ 2060 DT20605",
+    "qtyPerSet": 1,
+    "stock": 300,
+    "pending": 0,
+    "totalStock": 300,
+    "monthsRemaining": 4.9,
+    "moq": 50,
+    "forecast": {
+      "q3": 343,
+      "q4": 0,
+      "q1": 350,
+      "q2": 40,
+      "total": 733
+    },
+    "orderQty": {
+      "q3": 50,
+      "q4": 0,
+      "q1": 350,
+      "q2": 50,
+      "total": 450
+    },
+    "stockAfter": {
+      "q3": 7,
+      "q4": 7,
+      "q1": 7,
+      "q2": 17
+    },
+    "productionCapacity": 300
+  },
+  {
+    "seq": 45,
+    "code": "DT2060E",
+    "name": "เหล็กดามหูยกไถนา6จาน",
+    "qtyPerSet": 1,
+    "stock": 500,
+    "pending": 0,
+    "totalStock": 500,
+    "monthsRemaining": 8.2,
+    "moq": 50,
+    "forecast": {
+      "q3": 140,
+      "q4": 100,
+      "q1": 310,
+      "q2": 182,
+      "total": 732
+    },
+    "orderQty": {
+      "q3": 0,
+      "q4": 0,
+      "q1": 50,
+      "q2": 200,
+      "total": 250
+    },
+    "stockAfter": {
+      "q3": 360,
+      "q4": 260,
+      "q1": 0,
+      "q2": 18
+    },
+    "productionCapacity": 500
+  },
+  {
+    "seq": 46,
+    "code": "DT749-A",
+    "name": "ประแจไถนา 7 จาน 1 หัวงอ DT749",
+    "qtyPerSet": 1,
+    "stock": 195,
+    "pending": 78,
+    "totalStock": 273,
+    "monthsRemaining": 4.7,
+    "moq": 50,
+    "forecast": {
+      "q3": 200,
+      "q4": 0,
+      "q1": 200,
+      "q2": 300,
+      "total": 700
+    },
+    "orderQty": {
+      "q3": 0,
+      "q4": 0,
+      "q1": 150,
+      "q2": 300,
+      "total": 450
+    },
+    "stockAfter": {
+      "q3": 73,
+      "q4": 73,
+      "q1": 23,
+      "q2": 23
+    },
+    "productionCapacity": 273
+  },
+  {
+    "seq": 47,
+    "code": "DT20604",
+    "name": "เหล็กดามซอง-เล็ก 2060",
+    "qtyPerSet": 1,
+    "stock": 300,
+    "pending": 0,
+    "totalStock": 300,
+    "monthsRemaining": 6,
+    "moq": 50,
+    "forecast": {
+      "q3": 264,
+      "q4": 0,
+      "q1": 296,
+      "q2": 40,
+      "total": 600
+    },
+    "orderQty": {
+      "q3": 0,
+      "q4": 0,
+      "q1": 300,
+      "q2": 0,
+      "total": 300
+    },
+    "stockAfter": {
+      "q3": 36,
+      "q4": 36,
+      "q1": 40,
+      "q2": 0
+    },
+    "productionCapacity": 300
+  },
+  {
+    "seq": 48,
+    "code": "DT644-A",
+    "name": "ประแจไถนา 6 จาน 2 หัวงอ DT644",
+    "qtyPerSet": 1,
+    "stock": 0,
+    "pending": 300,
+    "totalStock": 300,
+    "monthsRemaining": 6.5,
+    "moq": 50,
+    "forecast": {
+      "q3": 80,
+      "q4": 0,
+      "q1": 241,
+      "q2": 229,
+      "total": 550
+    },
+    "orderQty": {
+      "q3": 0,
+      "q4": 0,
+      "q1": 50,
+      "q2": 200,
+      "total": 250
+    },
+    "stockAfter": {
+      "q3": 220,
+      "q4": 220,
+      "q1": 29,
+      "q2": 0
+    },
+    "productionCapacity": 300
+  },
+  {
+    "seq": 49,
+    "code": "DT646-A",
+    "name": "ประแจไถนา 6 จาน รุ่น 60L",
+    "qtyPerSet": 1,
+    "stock": 400,
+    "pending": 0,
+    "totalStock": 400,
+    "monthsRemaining": 10.7,
+    "moq": 50,
+    "forecast": {
+      "q3": 50,
+      "q4": 100,
+      "q1": 150,
+      "q2": 150,
+      "total": 450
+    },
+    "orderQty": {
+      "q3": 0,
+      "q4": 0,
+      "q1": 0,
+      "q2": 50,
+      "total": 50
+    },
+    "stockAfter": {
+      "q3": 350,
+      "q4": 250,
+      "q1": 100,
+      "q2": 0
+    },
+    "productionCapacity": 400
+  },
+  {
+    "seq": 50,
+    "code": "DT524",
+    "name": "ฝาครอบเพลาล้อหาง 5 จาน",
+    "qtyPerSet": 1,
+    "stock": 500,
+    "pending": 0,
+    "totalStock": 500,
+    "monthsRemaining": 13.3,
+    "moq": 50,
+    "forecast": {
+      "q3": 100,
+      "q4": 100,
+      "q1": 250,
+      "q2": 0,
+      "total": 450
+    },
+    "orderQty": {
+      "q3": 0,
+      "q4": 0,
+      "q1": 0,
+      "q2": 0,
+      "total": 0
+    },
+    "stockAfter": {
+      "q3": 400,
+      "q4": 300,
+      "q1": 50,
+      "q2": 50
+    },
+    "productionCapacity": 500
+  },
+  {
+    "seq": 51,
+    "code": "DT750-A",
+    "name": "ปะแจไถนา7จาน2หัวตรง",
+    "qtyPerSet": 1,
+    "stock": 550,
+    "pending": 0,
+    "totalStock": 550,
+    "monthsRemaining": 16.1,
+    "moq": 50,
+    "forecast": {
+      "q3": 0,
+      "q4": 10,
+      "q1": 300,
+      "q2": 100,
+      "total": 410
+    },
+    "orderQty": {
+      "q3": 0,
+      "q4": 0,
+      "q1": 0,
+      "q2": 0,
+      "total": 0
+    },
+    "stockAfter": {
+      "q3": 550,
+      "q4": 540,
+      "q1": 240,
+      "q2": 140
+    },
+    "productionCapacity": 550
+  },
+  {
+    "seq": 52,
+    "code": "DF011",
+    "name": "เหล็กดามสกีใบมีด DF011",
+    "qtyPerSet": 4,
+    "stock": 100,
+    "pending": 0,
+    "totalStock": 100,
+    "monthsRemaining": 3,
+    "moq": 50,
+    "forecast": {
+      "q3": 0,
+      "q4": 200,
+      "q1": 200,
+      "q2": 0,
+      "total": 400
+    },
+    "orderQty": {
+      "q3": 0,
+      "q4": 100,
+      "q1": 200,
+      "q2": 0,
+      "total": 300
+    },
+    "stockAfter": {
+      "q3": 100,
+      "q4": 0,
+      "q1": 0,
+      "q2": 0
+    },
+    "productionCapacity": 25
+  },
+  {
+    "seq": 53,
+    "code": "DF012RB",
+    "name": "เหล็กดามปากใบมีดR/B",
+    "qtyPerSet": 8,
+    "stock": 100,
+    "pending": 0,
+    "totalStock": 100,
+    "monthsRemaining": 3,
+    "moq": 50,
+    "forecast": {
+      "q3": 0,
+      "q4": 300,
+      "q1": 0,
+      "q2": 100,
+      "total": 400
+    },
+    "orderQty": {
+      "q3": 0,
+      "q4": 200,
+      "q1": 0,
+      "q2": 100,
+      "total": 300
+    },
+    "stockAfter": {
+      "q3": 100,
+      "q4": 0,
+      "q1": 0,
+      "q2": 0
+    },
+    "productionCapacity": 12
+  },
+  {
+    "seq": 54,
+    "code": "DF013RB",
+    "name": "เหล็กดามราวใบมีดR/B",
+    "qtyPerSet": 7,
+    "stock": 100,
+    "pending": 0,
+    "totalStock": 100,
+    "monthsRemaining": 3,
+    "moq": 50,
+    "forecast": {
+      "q3": 200,
+      "q4": 50,
+      "q1": 150,
+      "q2": 0,
+      "total": 400
+    },
+    "orderQty": {
+      "q3": 100,
+      "q4": 50,
+      "q1": 150,
+      "q2": 0,
+      "total": 300
+    },
+    "stockAfter": {
+      "q3": 0,
+      "q4": 0,
+      "q1": 0,
+      "q2": 0
+    },
+    "productionCapacity": 14
+  },
+  {
+    "seq": 55,
+    "code": "DT340-C",
+    "name": "ใบปาดดินไถบุกเบิก",
+    "qtyPerSet": 6,
+    "stock": 200,
+    "pending": 0,
+    "totalStock": 200,
+    "monthsRemaining": 6,
+    "moq": 50,
+    "forecast": {
+      "q3": 0,
+      "q4": 200,
+      "q1": 200,
+      "q2": 0,
+      "total": 400
+    },
+    "orderQty": {
+      "q3": 0,
+      "q4": 0,
+      "q1": 200,
+      "q2": 0,
+      "total": 200
+    },
+    "stockAfter": {
+      "q3": 200,
+      "q4": 0,
+      "q1": 0,
+      "q2": 0
+    },
+    "productionCapacity": 33
+  },
+  {
+    "seq": 56,
+    "code": "DF010B",
+    "name": "เหล็กแผ่นปะหัวคัทซี(กลาง)",
+    "qtyPerSet": 4,
+    "stock": 397,
+    "pending": 0,
+    "totalStock": 397,
+    "monthsRemaining": 12.3,
+    "moq": 50,
+    "forecast": {
+      "q3": 100,
+      "q4": 107,
+      "q1": 80,
+      "q2": 100,
+      "total": 387
+    },
+    "orderQty": {
+      "q3": 0,
+      "q4": 0,
+      "q1": 0,
+      "q2": 0,
+      "total": 0
+    },
+    "stockAfter": {
+      "q3": 297,
+      "q4": 190,
+      "q1": 110,
+      "q2": 10
+    },
+    "productionCapacity": 99
+  },
+  {
+    "seq": 57,
+    "code": "DF010A",
+    "name": "เหล็กแผ่นปะหัวคัซซี(สั้น)",
+    "qtyPerSet": 2,
+    "stock": 400,
+    "pending": 0,
+    "totalStock": 400,
+    "monthsRemaining": 13.7,
+    "moq": 50,
+    "forecast": {
+      "q3": 100,
+      "q4": 150,
+      "q1": 100,
+      "q2": 0,
+      "total": 350
+    },
+    "orderQty": {
+      "q3": 0,
+      "q4": 0,
+      "q1": 0,
+      "q2": 0,
+      "total": 0
+    },
+    "stockAfter": {
+      "q3": 300,
+      "q4": 150,
+      "q1": 50,
+      "q2": 50
+    },
+    "productionCapacity": 200
+  },
+  {
+    "seq": 58,
+    "code": "DF015C",
+    "name": "แหวนสลักตัวที 32x12มม DF015C",
+    "qtyPerSet": 4,
+    "stock": 0,
+    "pending": 200,
+    "totalStock": 200,
+    "monthsRemaining": 6.9,
+    "moq": 50,
+    "forecast": {
+      "q3": 0,
+      "q4": 350,
+      "q1": 0,
+      "q2": 0,
+      "total": 350
+    },
+    "orderQty": {
+      "q3": 0,
+      "q4": 150,
+      "q1": 0,
+      "q2": 0,
+      "total": 150
+    },
+    "stockAfter": {
+      "q3": 200,
+      "q4": 0,
+      "q1": 0,
+      "q2": 0
+    },
+    "productionCapacity": 50
+  },
+  {
+    "seq": 59,
+    "code": "DF015D",
+    "name": "แหวนรองหัวคัซซี รู 46* 12 มม.",
+    "qtyPerSet": 2,
+    "stock": 150,
+    "pending": 0,
+    "totalStock": 150,
+    "monthsRemaining": 5.1,
+    "moq": 50,
+    "forecast": {
+      "q3": 0,
+      "q4": 200,
+      "q1": 0,
+      "q2": 150,
+      "total": 350
+    },
+    "orderQty": {
+      "q3": 0,
+      "q4": 50,
+      "q1": 0,
+      "q2": 150,
+      "total": 200
+    },
+    "stockAfter": {
+      "q3": 150,
+      "q4": 0,
+      "q1": 0,
+      "q2": 0
+    },
+    "productionCapacity": 75
+  },
+  {
+    "seq": 60,
+    "code": "DH02",
+    "name": "บู๋ชประกับสาแหรกใบมีด",
+    "qtyPerSet": 2,
+    "stock": 358,
+    "pending": 0,
+    "totalStock": 358,
+    "monthsRemaining": 12.3,
+    "moq": 50,
+    "forecast": {
+      "q3": 0,
+      "q4": 150,
+      "q1": 0,
+      "q2": 200,
+      "total": 350
+    },
+    "orderQty": {
+      "q3": 0,
+      "q4": 0,
+      "q1": 0,
+      "q2": 0,
+      "total": 0
+    },
+    "stockAfter": {
+      "q3": 358,
+      "q4": 208,
+      "q1": 208,
+      "q2": 8
+    },
+    "productionCapacity": 179
+  },
+  {
+    "seq": 61,
+    "code": "DF589RB",
+    "name": "เหล็กดามหลังใบมีด R/B",
+    "qtyPerSet": 6,
+    "stock": 150,
+    "pending": 0,
+    "totalStock": 150,
+    "monthsRemaining": 5.3,
+    "moq": 50,
+    "forecast": {
+      "q3": 60,
+      "q4": 140,
+      "q1": 100,
+      "q2": 40,
+      "total": 340
+    },
+    "orderQty": {
+      "q3": 0,
+      "q4": 50,
+      "q1": 100,
+      "q2": 50,
+      "total": 200
+    },
+    "stockAfter": {
+      "q3": 90,
+      "q4": 0,
+      "q1": 0,
+      "q2": 10
+    },
+    "productionCapacity": 25
+  },
+  {
+    "seq": 62,
+    "code": "DF022",
+    "name": "เหล็กดามหัวคานยก",
+    "qtyPerSet": 4,
+    "stock": 70,
+    "pending": 0,
+    "totalStock": 70,
+    "monthsRemaining": 2.6,
+    "moq": 50,
+    "forecast": {
+      "q3": 0,
+      "q4": 197,
+      "q1": 120,
+      "q2": 0,
+      "total": 317
+    },
+    "orderQty": {
+      "q3": 0,
+      "q4": 150,
+      "q1": 100,
+      "q2": 0,
+      "total": 250
+    },
+    "stockAfter": {
+      "q3": 70,
+      "q4": 23,
+      "q1": 3,
+      "q2": 3
+    },
+    "productionCapacity": 17
+  },
+  {
+    "seq": 63,
+    "code": "DT320B",
+    "name": "ฝาครอบแป๊บไถนา 5 จาน มีรู",
+    "qtyPerSet": 1,
+    "stock": 359,
+    "pending": 0,
+    "totalStock": 359,
+    "monthsRemaining": 14.4,
+    "moq": 50,
+    "forecast": {
+      "q3": 0,
+      "q4": 0,
+      "q1": 0,
+      "q2": 300,
+      "total": 300
+    },
+    "orderQty": {
+      "q3": 0,
+      "q4": 0,
+      "q1": 0,
+      "q2": 0,
+      "total": 0
+    },
+    "stockAfter": {
+      "q3": 359,
+      "q4": 359,
+      "q1": 359,
+      "q2": 59
+    },
+    "productionCapacity": 359
+  },
+  {
+    "seq": 64,
+    "code": "DF900",
+    "name": "เหล็กรับคานแขวนกระบอก DF900",
+    "qtyPerSet": 2,
+    "stock": 100,
+    "pending": 0,
+    "totalStock": 100,
+    "monthsRemaining": 4,
+    "moq": 50,
+    "forecast": {
+      "q3": 100,
+      "q4": 200,
+      "q1": 0,
+      "q2": 0,
+      "total": 300
+    },
+    "orderQty": {
+      "q3": 0,
+      "q4": 200,
+      "q1": 0,
+      "q2": 0,
+      "total": 200
+    },
+    "stockAfter": {
+      "q3": 0,
+      "q4": 0,
+      "q1": 0,
+      "q2": 0
+    },
+    "productionCapacity": 50
+  },
+  {
+    "seq": 65,
+    "code": "DF015A",
+    "name": "แหวนสลักตัวทีรู25x12มม DF015A",
+    "qtyPerSet": 2,
+    "stock": 150,
+    "pending": 0,
+    "totalStock": 150,
+    "monthsRemaining": 6,
+    "moq": 50,
+    "forecast": {
+      "q3": 0,
+      "q4": 200,
+      "q1": 0,
+      "q2": 100,
+      "total": 300
+    },
+    "orderQty": {
+      "q3": 0,
+      "q4": 50,
+      "q1": 0,
+      "q2": 100,
+      "total": 150
+    },
+    "stockAfter": {
+      "q3": 150,
+      "q4": 0,
+      "q1": 0,
+      "q2": 0
+    },
+    "productionCapacity": 75
+  },
+  {
+    "seq": 66,
+    "code": "DT10602",
+    "name": "เหล็กดามโคนเอเฟรมMTD1060",
+    "qtyPerSet": 1,
+    "stock": 126,
+    "pending": 0,
+    "totalStock": 126,
+    "monthsRemaining": 5.1,
+    "moq": 50,
+    "forecast": {
+      "q3": 50,
+      "q4": 174,
+      "q1": 70,
+      "q2": 0,
+      "total": 294
+    },
+    "orderQty": {
+      "q3": 0,
+      "q4": 100,
+      "q1": 100,
+      "q2": 0,
+      "total": 200
+    },
+    "stockAfter": {
+      "q3": 76,
+      "q4": 2,
+      "q1": 32,
+      "q2": 32
+    },
+    "productionCapacity": 126
+  },
+  {
+    "seq": 67,
+    "code": "DT10506N",
+    "name": "ขายึดซองเอเฟรมไถนา รุ่น 1060",
+    "qtyPerSet": 1,
+    "stock": 157,
+    "pending": 0,
+    "totalStock": 157,
+    "monthsRemaining": 6.4,
+    "moq": 50,
+    "forecast": {
+      "q3": 0,
+      "q4": 178,
+      "q1": 115,
+      "q2": 0,
+      "total": 293
+    },
+    "orderQty": {
+      "q3": 0,
+      "q4": 50,
+      "q1": 100,
+      "q2": 0,
+      "total": 150
+    },
+    "stockAfter": {
+      "q3": 157,
+      "q4": 29,
+      "q1": 14,
+      "q2": 14
+    },
+    "productionCapacity": 157
+  },
+  {
+    "seq": 68,
+    "code": "DF010C",
+    "name": "เหล็กแผ่นปะหัวคัทซี(ยาว)",
+    "qtyPerSet": 2,
+    "stock": 310,
+    "pending": 0,
+    "totalStock": 310,
+    "monthsRemaining": 13.3,
+    "moq": 50,
+    "forecast": {
+      "q3": 50,
+      "q4": 0,
+      "q1": 150,
+      "q2": 80,
+      "total": 280
+    },
+    "orderQty": {
+      "q3": 0,
+      "q4": 0,
+      "q1": 0,
+      "q2": 0,
+      "total": 0
+    },
+    "stockAfter": {
+      "q3": 260,
+      "q4": 260,
+      "q1": 110,
+      "q2": 30
+    },
+    "productionCapacity": 155
+  },
+  {
+    "seq": 69,
+    "code": "DF09A",
+    "name": "เหล็กดามคานยก-งอ (สั้น) DF09A",
+    "qtyPerSet": 2,
+    "stock": 120,
+    "pending": 0,
+    "totalStock": 120,
+    "monthsRemaining": 6.5,
+    "moq": 50,
+    "forecast": {
+      "q3": 0,
+      "q4": 180,
+      "q1": 42,
+      "q2": 0,
+      "total": 222
+    },
+    "orderQty": {
+      "q3": 0,
+      "q4": 100,
+      "q1": 50,
+      "q2": 0,
+      "total": 150
+    },
+    "stockAfter": {
+      "q3": 120,
+      "q4": 40,
+      "q1": 48,
+      "q2": 48
+    },
+    "productionCapacity": 60
+  },
+  {
+    "seq": 70,
+    "code": "DF014",
+    "name": "เหล็กเสริมหัวคัทซีใบมีด DF014",
+    "qtyPerSet": 2,
+    "stock": 150,
+    "pending": 0,
+    "totalStock": 150,
+    "monthsRemaining": 9,
+    "moq": 50,
+    "forecast": {
+      "q3": 50,
+      "q4": 100,
+      "q1": 0,
+      "q2": 50,
+      "total": 200
+    },
+    "orderQty": {
+      "q3": 0,
+      "q4": 0,
+      "q1": 0,
+      "q2": 50,
+      "total": 50
+    },
+    "stockAfter": {
+      "q3": 100,
+      "q4": 0,
+      "q1": 0,
+      "q2": 0
+    },
+    "productionCapacity": 75
+  },
+  {
+    "seq": 71,
+    "code": "M1060-1201",
+    "name": "ขาซองเอเฟรมไถ 5",
+    "qtyPerSet": 2,
+    "stock": 173,
+    "pending": 0,
+    "totalStock": 173,
+    "monthsRemaining": 11.1,
+    "moq": 50,
+    "forecast": {
+      "q3": 47,
+      "q4": 0,
+      "q1": 140,
+      "q2": 0,
+      "total": 187
+    },
+    "orderQty": {
+      "q3": 0,
+      "q4": 0,
+      "q1": 50,
+      "q2": 0,
+      "total": 50
+    },
+    "stockAfter": {
+      "q3": 126,
+      "q4": 126,
+      "q1": 36,
+      "q2": 36
+    },
+    "productionCapacity": 86
+  },
+  {
+    "seq": 72,
+    "code": "DT540-A",
+    "name": "ประแจไถนา 5 จาน 2 หัวตรง 1050",
+    "qtyPerSet": 1,
+    "stock": 0,
+    "pending": 0,
+    "totalStock": 0,
+    "monthsRemaining": 0,
+    "moq": 50,
+    "forecast": {
+      "q3": 0,
+      "q4": 0,
+      "q1": 30,
+      "q2": 153,
+      "total": 183
+    },
+    "orderQty": {
+      "q3": 0,
+      "q4": 0,
+      "q1": 50,
+      "q2": 150,
+      "total": 200
+    },
+    "stockAfter": {
+      "q3": 0,
+      "q4": 0,
+      "q1": 20,
+      "q2": 17
+    },
+    "productionCapacity": 0
+  },
+  {
+    "seq": 73,
+    "code": "DF08",
+    "name": "แผ่นลายกันลื่น DF08",
+    "qtyPerSet": 2,
+    "stock": 122,
+    "pending": 0,
+    "totalStock": 122,
+    "monthsRemaining": 8.5,
+    "moq": 50,
+    "forecast": {
+      "q3": 0,
+      "q4": 133,
+      "q1": 0,
+      "q2": 40,
+      "total": 173
+    },
+    "orderQty": {
+      "q3": 0,
+      "q4": 50,
+      "q1": 0,
+      "q2": 50,
+      "total": 100
+    },
+    "stockAfter": {
+      "q3": 122,
+      "q4": 39,
+      "q1": 39,
+      "q2": 49
+    },
+    "productionCapacity": 61
+  },
+  {
+    "seq": 74,
+    "code": "DF09C",
+    "name": "เหล็กแผ่นปะคานยก-ตรงDF09C",
+    "qtyPerSet": 2,
+    "stock": 157,
+    "pending": 0,
+    "totalStock": 157,
+    "monthsRemaining": 11.4,
+    "moq": 50,
+    "forecast": {
+      "q3": 0,
+      "q4": 105,
+      "q1": 60,
+      "q2": 0,
+      "total": 165
+    },
+    "orderQty": {
+      "q3": 0,
+      "q4": 0,
+      "q1": 50,
+      "q2": 0,
+      "total": 50
+    },
+    "stockAfter": {
+      "q3": 157,
+      "q4": 52,
+      "q1": 42,
+      "q2": 42
+    },
+    "productionCapacity": 78
+  },
+  {
+    "seq": 75,
+    "code": "DF09B",
+    "name": "เหล็กดามคานยก-งอ(ยาว) DF09B",
+    "qtyPerSet": 2,
+    "stock": 99,
+    "pending": 0,
+    "totalStock": 99,
+    "monthsRemaining": 7.4,
+    "moq": 50,
+    "forecast": {
+      "q3": 0,
+      "q4": 100,
+      "q1": 60,
+      "q2": 0,
+      "total": 160
+    },
+    "orderQty": {
+      "q3": 0,
+      "q4": 50,
+      "q1": 50,
+      "q2": 0,
+      "total": 100
+    },
+    "stockAfter": {
+      "q3": 99,
+      "q4": 49,
+      "q1": 39,
+      "q2": 39
+    },
+    "productionCapacity": 49
+  },
+  {
+    "seq": 76,
+    "code": "DF015B",
+    "name": "แหวนสลักตัวทีรู32x8มม DF015B",
+    "qtyPerSet": 2,
+    "stock": 148,
+    "pending": 0,
+    "totalStock": 148,
+    "monthsRemaining": 11.7,
+    "moq": 50,
+    "forecast": {
+      "q3": 0,
+      "q4": 152,
+      "q1": 0,
+      "q2": 0,
+      "total": 152
+    },
+    "orderQty": {
+      "q3": 0,
+      "q4": 50,
+      "q1": 0,
+      "q2": 0,
+      "total": 50
+    },
+    "stockAfter": {
+      "q3": 148,
+      "q4": 46,
+      "q1": 46,
+      "q2": 46
+    },
+    "productionCapacity": 74
+  },
+  {
+    "seq": 77,
+    "code": "DF02",
+    "name": "เหล็กใส่ลายคันเร่งเท้า",
+    "qtyPerSet": 2,
+    "stock": 200,
+    "pending": 0,
+    "totalStock": 200,
+    "monthsRemaining": 16,
+    "moq": 50,
+    "forecast": {
+      "q3": 50,
+      "q4": 0,
+      "q1": 100,
+      "q2": 0,
+      "total": 150
+    },
+    "orderQty": {
+      "q3": 0,
+      "q4": 0,
+      "q1": 0,
+      "q2": 0,
+      "total": 0
+    },
+    "stockAfter": {
+      "q3": 150,
+      "q4": 150,
+      "q1": 50,
+      "q2": 50
+    },
+    "productionCapacity": 100
+  },
+  {
+    "seq": 78,
+    "code": "DF07A",
+    "name": "เหล็กยึดคันเร่งเท้า DF07A",
+    "qtyPerSet": 2,
+    "stock": 200,
+    "pending": 0,
+    "totalStock": 200,
+    "monthsRemaining": 16,
+    "moq": 50,
+    "forecast": {
+      "q3": 100,
+      "q4": 0,
+      "q1": 50,
+      "q2": 0,
+      "total": 150
+    },
+    "orderQty": {
+      "q3": 0,
+      "q4": 0,
+      "q1": 0,
+      "q2": 0,
+      "total": 0
+    },
+    "stockAfter": {
+      "q3": 100,
+      "q4": 100,
+      "q1": 50,
+      "q2": 50
+    },
+    "productionCapacity": 100
+  },
+  {
+    "seq": 79,
+    "code": "DT539-A",
+    "name": "ประแจไถนา 5 จาน 2 หัวงอ",
+    "qtyPerSet": 1,
+    "stock": 0,
+    "pending": 0,
+    "totalStock": 0,
+    "monthsRemaining": 0,
+    "moq": 50,
+    "forecast": {
+      "q3": 30,
+      "q4": 34,
+      "q1": 85,
+      "q2": 0,
+      "total": 149
+    },
+    "orderQty": {
+      "q3": 50,
+      "q4": 50,
+      "q1": 50,
+      "q2": 0,
+      "total": 150
+    },
+    "stockAfter": {
+      "q3": 20,
+      "q4": 36,
+      "q1": 1,
+      "q2": 1
+    },
+    "productionCapacity": 0
+  },
+  {
+    "seq": 80,
+    "code": "DT535-A",
+    "name": "ฝาครอบบังคับลูกปืนก้ามปูไถนา 5 จาน 25 แรง",
+    "qtyPerSet": 1,
+    "stock": 268,
+    "pending": 0,
+    "totalStock": 268,
+    "monthsRemaining": 23,
+    "moq": 50,
+    "forecast": {
+      "q3": 20,
+      "q4": 50,
+      "q1": 50,
+      "q2": 20,
+      "total": 140
+    },
+    "orderQty": {
+      "q3": 0,
+      "q4": 0,
+      "q1": 0,
+      "q2": 0,
+      "total": 0
+    },
+    "stockAfter": {
+      "q3": 248,
+      "q4": 198,
+      "q1": 148,
+      "q2": 128
+    },
+    "productionCapacity": 268
+  },
+  {
+    "seq": 81,
+    "code": "DT328B",
+    "name": "เหล็กดามไส้ตัวยูโครงไถนา 5 จาน DT328B",
+    "qtyPerSet": 1,
+    "stock": 15,
+    "pending": 300,
+    "totalStock": 315,
+    "monthsRemaining": 27.6,
+    "moq": 50,
+    "forecast": {
+      "q3": 50,
+      "q4": 7,
+      "q1": 30,
+      "q2": 50,
+      "total": 137
+    },
+    "orderQty": {
+      "q3": 0,
+      "q4": 0,
+      "q1": 0,
+      "q2": 0,
+      "total": 0
+    },
+    "stockAfter": {
+      "q3": 265,
+      "q4": 258,
+      "q1": 228,
+      "q2": 178
+    },
+    "productionCapacity": 315
+  },
+  {
+    "seq": 82,
+    "code": "DT10601",
+    "name": "เหล็กดามหูยกไถนา DT10601",
+    "qtyPerSet": 1,
+    "stock": 47,
+    "pending": 0,
+    "totalStock": 47,
+    "monthsRemaining": 4.7,
+    "moq": 50,
+    "forecast": {
+      "q3": 50,
+      "q4": 1,
+      "q1": 70,
+      "q2": 0,
+      "total": 121
+    },
+    "orderQty": {
+      "q3": 50,
+      "q4": 0,
+      "q1": 50,
+      "q2": 0,
+      "total": 100
+    },
+    "stockAfter": {
+      "q3": 47,
+      "q4": 46,
+      "q1": 26,
+      "q2": 26
+    },
+    "productionCapacity": 47
+  },
+  {
+    "seq": 83,
+    "code": "DF240-F",
+    "name": "ประแจขันกระบอกไฮโดรลิค",
+    "qtyPerSet": 1,
+    "stock": 100,
+    "pending": 0,
+    "totalStock": 100,
+    "monthsRemaining": 10,
+    "moq": 50,
+    "forecast": {
+      "q3": 50,
+      "q4": 10,
+      "q1": 60,
+      "q2": 0,
+      "total": 120
+    },
+    "orderQty": {
+      "q3": 0,
+      "q4": 0,
+      "q1": 50,
+      "q2": 0,
+      "total": 50
+    },
+    "stockAfter": {
+      "q3": 50,
+      "q4": 40,
+      "q1": 30,
+      "q2": 30
+    },
+    "productionCapacity": 100
+  },
+  {
+    "seq": 84,
+    "code": "DT10501",
+    "name": "ตุ๊กตาไถนา",
+    "qtyPerSet": 1,
+    "stock": 168,
+    "pending": 0,
+    "totalStock": 168,
+    "monthsRemaining": 20.2,
+    "moq": 50,
+    "forecast": {
+      "q3": 50,
+      "q4": 0,
+      "q1": 30,
+      "q2": 20,
+      "total": 100
+    },
+    "orderQty": {
+      "q3": 0,
+      "q4": 0,
+      "q1": 0,
+      "q2": 0,
+      "total": 0
+    },
+    "stockAfter": {
+      "q3": 118,
+      "q4": 118,
+      "q1": 88,
+      "q2": 68
+    },
+    "productionCapacity": 168
+  },
+  {
+    "seq": 85,
+    "code": "DF07",
+    "name": "เหล็กดามที่พักเท้า",
+    "qtyPerSet": 2,
+    "stock": 200,
+    "pending": 0,
+    "totalStock": 200,
+    "monthsRemaining": 24,
+    "moq": 50,
+    "forecast": {
+      "q3": 50,
+      "q4": 0,
+      "q1": 0,
+      "q2": 50,
+      "total": 100
+    },
+    "orderQty": {
+      "q3": 0,
+      "q4": 0,
+      "q1": 0,
+      "q2": 0,
+      "total": 0
+    },
+    "stockAfter": {
+      "q3": 150,
+      "q4": 150,
+      "q1": 150,
+      "q2": 100
+    },
+    "productionCapacity": 100
+  },
+  {
+    "seq": 86,
+    "code": "DF01",
+    "name": "เหล็กลายใหญ่คันเร่งเท้า",
+    "qtyPerSet": 1,
+    "stock": 140,
+    "pending": 0,
+    "totalStock": 140,
+    "monthsRemaining": 16.8,
+    "moq": 50,
+    "forecast": {
+      "q3": 50,
+      "q4": 0,
+      "q1": 50,
+      "q2": 0,
+      "total": 100
+    },
+    "orderQty": {
+      "q3": 0,
+      "q4": 0,
+      "q1": 0,
+      "q2": 0,
+      "total": 0
+    },
+    "stockAfter": {
+      "q3": 90,
+      "q4": 90,
+      "q1": 40,
+      "q2": 40
+    },
+    "productionCapacity": 140
+  },
+  {
+    "seq": 87,
+    "code": "DF020",
+    "name": "แหวนปลั๊กคอนโทรล90องศา",
+    "qtyPerSet": 2,
+    "stock": 200,
+    "pending": 0,
+    "totalStock": 200,
+    "monthsRemaining": 24,
+    "moq": 50,
+    "forecast": {
+      "q3": 50,
+      "q4": 0,
+      "q1": 0,
+      "q2": 50,
+      "total": 100
+    },
+    "orderQty": {
+      "q3": 0,
+      "q4": 0,
+      "q1": 0,
+      "q2": 0,
+      "total": 0
+    },
+    "stockAfter": {
+      "q3": 150,
+      "q4": 150,
+      "q1": 150,
+      "q2": 100
+    },
+    "productionCapacity": 100
+  },
+  {
+    "seq": 88,
+    "code": "DF568A",
+    "name": "แผ่นปะกับแป๊ปน้ำมันDF568",
+    "qtyPerSet": 5,
+    "stock": 100,
+    "pending": 0,
+    "totalStock": 100,
+    "monthsRemaining": 12,
+    "moq": 50,
+    "forecast": {
+      "q3": 0,
+      "q4": 0,
+      "q1": 0,
+      "q2": 100,
+      "total": 100
+    },
+    "orderQty": {
+      "q3": 0,
+      "q4": 0,
+      "q1": 0,
+      "q2": 0,
+      "total": 0
+    },
+    "stockAfter": {
+      "q3": 100,
+      "q4": 100,
+      "q1": 100,
+      "q2": 0
+    },
+    "productionCapacity": 20
+  },
+  {
+    "seq": 89,
+    "code": "DF588A",
+    "name": "ขาตั้งแป๊ปน้ำมัน(สั้น) DF588",
+    "qtyPerSet": 2,
+    "stock": 97,
+    "pending": 0,
+    "totalStock": 97,
+    "monthsRemaining": 11.6,
+    "moq": 50,
+    "forecast": {
+      "q3": 50,
+      "q4": 0,
+      "q1": 0,
+      "q2": 50,
+      "total": 100
+    },
+    "orderQty": {
+      "q3": 0,
+      "q4": 0,
+      "q1": 0,
+      "q2": 50,
+      "total": 50
+    },
+    "stockAfter": {
+      "q3": 47,
+      "q4": 47,
+      "q1": 47,
+      "q2": 47
+    },
+    "productionCapacity": 48
+  },
+  {
+    "seq": 90,
+    "code": "DT10507",
+    "name": "เหล็กติดหูยกไถนา5จาน เล็ก",
+    "qtyPerSet": 1,
+    "stock": 94,
+    "pending": 0,
+    "totalStock": 94,
+    "monthsRemaining": 11.3,
+    "moq": 50,
+    "forecast": {
+      "q3": 0,
+      "q4": 20,
+      "q1": 30,
+      "q2": 50,
+      "total": 100
+    },
+    "orderQty": {
+      "q3": 0,
+      "q4": 0,
+      "q1": 0,
+      "q2": 50,
+      "total": 50
+    },
+    "stockAfter": {
+      "q3": 94,
+      "q4": 74,
+      "q1": 44,
+      "q2": 44
+    },
+    "productionCapacity": 94
+  },
+  {
+    "seq": 91,
+    "code": "DF590RB",
+    "name": "เหล็กดามหลังใบมีดR/Bมีรู",
+    "qtyPerSet": 1,
+    "stock": 208,
+    "pending": 0,
+    "totalStock": 208,
+    "monthsRemaining": 27.1,
+    "moq": 50,
+    "forecast": {
+      "q3": 0,
+      "q4": 52,
+      "q1": 0,
+      "q2": 40,
+      "total": 92
+    },
+    "orderQty": {
+      "q3": 0,
+      "q4": 0,
+      "q1": 0,
+      "q2": 0,
+      "total": 0
+    },
+    "stockAfter": {
+      "q3": 208,
+      "q4": 156,
+      "q1": 156,
+      "q2": 116
+    },
+    "productionCapacity": 208
+  },
+  {
+    "seq": 92,
+    "code": "DT328",
+    "name": "เหล็กตัวยูติดโครงไถนา5จาน",
+    "qtyPerSet": 1,
+    "stock": 101,
+    "pending": 300,
+    "totalStock": 401,
+    "monthsRemaining": 60.2,
+    "moq": 50,
+    "forecast": {
+      "q3": 0,
+      "q4": 0,
+      "q1": 30,
+      "q2": 50,
+      "total": 80
+    },
+    "orderQty": {
+      "q3": 0,
+      "q4": 0,
+      "q1": 0,
+      "q2": 0,
+      "total": 0
+    },
+    "stockAfter": {
+      "q3": 401,
+      "q4": 401,
+      "q1": 371,
+      "q2": 321
+    },
+    "productionCapacity": 401
+  },
+  {
+    "seq": 93,
+    "code": "DT10508",
+    "name": "เหล็กดามโคนเอเฟรมMTD1050",
+    "qtyPerSet": 1,
+    "stock": 102,
+    "pending": 0,
+    "totalStock": 102,
+    "monthsRemaining": 15.3,
+    "moq": 50,
+    "forecast": {
+      "q3": 30,
+      "q4": 10,
+      "q1": 20,
+      "q2": 20,
+      "total": 80
+    },
+    "orderQty": {
+      "q3": 0,
+      "q4": 0,
+      "q1": 0,
+      "q2": 0,
+      "total": 0
+    },
+    "stockAfter": {
+      "q3": 72,
+      "q4": 62,
+      "q1": 42,
+      "q2": 22
+    },
+    "productionCapacity": 102
+  },
+  {
+    "seq": 94,
+    "code": "DT10604",
+    "name": "เหล็กดามซองเล็ก 1060",
+    "qtyPerSet": 1,
+    "stock": 100,
+    "pending": 0,
+    "totalStock": 100,
+    "monthsRemaining": 17.1,
+    "moq": 50,
+    "forecast": {
+      "q3": 0,
+      "q4": 0,
+      "q1": 20,
+      "q2": 50,
+      "total": 70
+    },
+    "orderQty": {
+      "q3": 0,
+      "q4": 0,
+      "q1": 0,
+      "q2": 0,
+      "total": 0
+    },
+    "stockAfter": {
+      "q3": 100,
+      "q4": 100,
+      "q1": 80,
+      "q2": 30
+    },
+    "productionCapacity": 100
+  },
+  {
+    "seq": 95,
+    "code": "DT10605",
+    "name": "เหล็กดามซองใหญ่",
+    "qtyPerSet": 1,
+    "stock": 99,
+    "pending": 0,
+    "totalStock": 99,
+    "monthsRemaining": 17,
+    "moq": 50,
+    "forecast": {
+      "q3": 0,
+      "q4": 0,
+      "q1": 20,
+      "q2": 50,
+      "total": 70
+    },
+    "orderQty": {
+      "q3": 0,
+      "q4": 0,
+      "q1": 0,
+      "q2": 0,
+      "total": 0
+    },
+    "stockAfter": {
+      "q3": 99,
+      "q4": 99,
+      "q1": 79,
+      "q2": 29
+    },
+    "productionCapacity": 99
+  },
+  {
+    "seq": 96,
+    "code": "DF021",
+    "name": "เหล็กยึดที่พักเท้า",
+    "qtyPerSet": 2,
+    "stock": 70,
+    "pending": 0,
+    "totalStock": 70,
+    "monthsRemaining": 16.8,
+    "moq": 50,
+    "forecast": {
+      "q3": 30,
+      "q4": 0,
+      "q1": 20,
+      "q2": 0,
+      "total": 50
+    },
+    "orderQty": {
+      "q3": 0,
+      "q4": 0,
+      "q1": 0,
+      "q2": 0,
+      "total": 0
+    },
+    "stockAfter": {
+      "q3": 40,
+      "q4": 40,
+      "q1": 20,
+      "q2": 20
+    },
+    "productionCapacity": 35
+  },
+  {
+    "seq": 97,
+    "code": "DF587",
+    "name": "ขาตั้งแป๊ปน้ำมัน(ยาว)",
+    "qtyPerSet": 1,
+    "stock": 100,
+    "pending": 0,
+    "totalStock": 100,
+    "monthsRemaining": 24,
+    "moq": 50,
+    "forecast": {
+      "q3": 50,
+      "q4": 0,
+      "q1": 0,
+      "q2": 0,
+      "total": 50
+    },
+    "orderQty": {
+      "q3": 0,
+      "q4": 0,
+      "q1": 0,
+      "q2": 0,
+      "total": 0
+    },
+    "stockAfter": {
+      "q3": 50,
+      "q4": 50,
+      "q1": 50,
+      "q2": 50
+    },
+    "productionCapacity": 100
+  }
+];
+
+// ---------------- state ----------------
+let partsCache = {};      // code -> part doc
+let activeQuarter = 'q3'; // default
+let activeFilter = 'all';
+let searchTerm = '';
+let db, auth;
+let firebaseReady = false;
+
+// ---------------- helpers ----------------
+function ceilToMOQ(qty, moq){
+  qty = Math.max(qty, 0);
+  if(!moq || moq <= 0) return Math.ceil(qty);
+  return Math.ceil(qty / moq) * moq;
+}
+function fmt(n){
+  if(n === undefined || n === null || isNaN(n)) return '-';
+  return Number(n).toLocaleString('th-TH');
+}
+function monthsClass(m){
+  if(m === undefined || m === null) return 'ok';
+  if(m < 3) return 'danger';
+  if(m < 6) return 'warn';
+  return 'ok';
+}
+function currentUser(){
+  const name = document.getElementById('userName').value.trim() || 'ไม่ระบุชื่อ';
+  const dept = document.getElementById('userDept').value;
+  localStorage.setItem('fc_user_name', name);
+  localStorage.setItem('fc_user_dept', dept);
+  return {name, dept};
+}
+function loadUserFromStorage(){
+  const n = localStorage.getItem('fc_user_name');
+  const d = localStorage.getItem('fc_user_dept');
+  if(n) document.getElementById('userName').value = n;
+  if(d) document.getElementById('userDept').value = d;
+}
+
+function defaultQuarterState(){
+  return {status:'need', requestedQty:0, requestedBy:'', requestedAt:null,
+          poNumber:'', orderedQty:0, orderedBy:'', orderedAt:null,
+          receivedQty:0, receivedBy:'', receivedAt:null, note:''};
+}
+function ensureQuarters(part){
+  part.quarters = part.quarters || {};
+  QUARTERS.forEach(q=>{
+    if(!part.quarters[q.key]) part.quarters[q.key] = defaultQuarterState();
+  });
+  return part;
+}
+
+// ---------------- Firebase init ----------------
+try{
+  if(firebaseConfig.apiKey && firebaseConfig.apiKey !== 'YOUR_API_KEY'){
+    const app = initializeApp(firebaseConfig);
+    db = getFirestore(app);
+    auth = getAuth(app);
+    firebaseReady = true;
+    signInAnonymously(auth).catch(err=>{
+      console.error('Auth error', err);
+      setConn(false, 'เชื่อมต่อไม่สำเร็จ (Auth)');
+    });
+    onAuthStateChanged(auth, (user)=>{
+      if(user){
+        setConn(true, 'เชื่อมต่อแล้ว · real-time sync');
+        startListeners();
+      }
+    });
+  } else {
+    document.getElementById('setupBanner').classList.remove('hidden');
+    setConn(false, 'ยังไม่ได้ตั้งค่า Firebase');
+  }
+}catch(e){
+  console.error(e);
+  document.getElementById('setupBanner').classList.remove('hidden');
+  setConn(false, 'ตั้งค่า Firebase ผิดพลาด');
+}
+
+function setConn(ok, text){
+  const el = document.getElementById('connStatus');
+  el.className = 'status-pill ' + (ok ? 'on' : 'off');
+  el.innerHTML = '<span class="dot"></span> ' + text;
+}
+
+function startListeners(){
+  const partsCol = collection(db, 'parts');
+  onSnapshot(partsCol, (snap)=>{
+    partsCache = {};
+    snap.forEach(d=> partsCache[d.id] = ensureQuarters(d.data()));
+    renderTable();
+    renderCards();
+  }, (err)=>{
+    console.error(err);
+    setConn(false, 'อ่านข้อมูลไม่สำเร็จ (เช็ค Firestore rules)');
+  });
+
+  const activityQ = query(collection(db, 'activity'), orderBy('ts','desc'), limit(60));
+  onSnapshot(activityQ, (snap)=>{
+    renderActivity(snap.docs.map(d=>d.data()));
+  }, (err)=>console.error(err));
+}
+
+// ---------------- rendering ----------------
+function renderCards(){
+  const parts = Object.values(partsCache);
+  document.getElementById('cardTotal').textContent = parts.length || '-';
+  const urgent = parts.filter(p=> computeMonths(p) < 3).length;
+  document.getElementById('cardUrgent').textContent = parts.length ? urgent : '-';
+  const pending = parts.filter(p=> (p.quarters[activeQuarter]?.status||'need') !== 'received').length;
+  document.getElementById('cardPending').textContent = parts.length ? pending : '-';
+  const received = parts.filter(p=> (p.quarters[activeQuarter]?.status) === 'received').length;
+  document.getElementById('cardReceived').textContent = parts.length ? received : '-';
+}
+
+function computeMonths(p){
+  const totalStock = (p.stock||0) + (p.pending||0);
+  const totalForecast = p.forecast?.total || 0;
+  if(!totalForecast) return totalStock > 0 ? 999 : 0;
+  return totalStock / (totalForecast/12);
+}
+
+function renderTable(){
+  const tbody = document.getElementById('tableBody');
+  let parts = Object.values(partsCache).sort((a,b)=> (a.seq||0)-(b.seq||0));
+
+  if(searchTerm){
+    const t = searchTerm.toLowerCase();
+    parts = parts.filter(p=> (p.code||'').toLowerCase().includes(t) || (p.name||'').toLowerCase().includes(t));
+  }
+  if(activeFilter === 'urgent'){
+    parts = parts.filter(p=> computeMonths(p) < 3);
+  } else if(activeFilter === 'pending'){
+    parts = parts.filter(p=> (p.quarters[activeQuarter]?.status||'need') !== 'received');
+  }
+
+  if(!parts.length){
+    tbody.innerHTML = '<tr><td colspan="9" class="empty-hint">ไม่พบข้อมูล — ลองกด "โหลดข้อมูลเริ่มต้น" ด้านบน หรือปรับตัวกรอง</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = parts.map(p=>{
+    const months = computeMonths(p);
+    const mClass = monthsClass(months);
+    const totalStock = (p.stock||0) + (p.pending||0);
+    const forecastQ = p.forecast?.[activeQuarter] || 0;
+    const recommended = ceilToMOQ(forecastQ - totalStock, p.moq||0);
+    const qState = p.quarters[activeQuarter] || defaultQuarterState();
+    const badgeClass = qState.status;
+    return `
+      <tr data-code="${p.code}">
+        <td><div class="code">${p.code}</div><div class="name">${escapeHtml(p.name||'')}</div></td>
+        <td class="num"><input class="editable" type="number" value="${p.stock||0}" data-field="stock" data-code="${p.code}"></td>
+        <td class="num"><input class="editable" type="number" value="${p.pending||0}" data-field="pending" data-code="${p.code}"></td>
+        <td class="num"><input class="editable" type="number" value="${p.moq||0}" data-field="moq" data-code="${p.code}"></td>
+        <td class="num"><span class="months-tag ${mClass}">${months>=999?'∞':months.toFixed(1)}</span></td>
+        <td class="num">${fmt(forecastQ)}</td>
+        <td class="num"><b>${recommended>0?fmt(recommended):'-'}</b></td>
+        <td><span class="badge ${badgeClass}">${STATUS_LABEL[qState.status]}</span></td>
+        <td><button class="manage-btn" data-code="${p.code}" data-action="manage">จัดการ</button></td>
+      </tr>`;
+  }).join('');
+
+  tbody.querySelectorAll('.editable').forEach(inp=>{
+    inp.addEventListener('change', onFieldEdit);
+  });
+  tbody.querySelectorAll('[data-action="manage"]').forEach(btn=>{
+    btn.addEventListener('click', ()=> openModal(btn.dataset.code));
+  });
+}
+
+function escapeHtml(s){
+  return String(s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+function renderActivity(items){
+  const feed = document.getElementById('activityFeed');
+  if(!items.length){
+    feed.innerHTML = '<div class="empty-hint">ยังไม่มีความเคลื่อนไหว</div>';
+    return;
+  }
+  feed.innerHTML = items.map(a=>{
+    const deptClass = 'dept-'+(a.dept||'planning');
+    const time = a.ts?.toDate ? a.ts.toDate().toLocaleString('th-TH') : '';
+    return `<div class="activity-item">
+      <span class="dept-tag ${deptClass}">${DEPT_LABEL[a.dept]||a.dept}</span>
+      <b>${escapeHtml(a.user||'')}</b> ${escapeHtml(a.action||'')}
+      <div class="time">${time}</div>
+    </div>`;
+  }).join('');
+}
+
+// ---------------- field edit (stock/pending/moq) ----------------
+async function onFieldEdit(e){
+  if(!firebaseReady) return alert('ยังไม่ได้เชื่อมต่อฐานข้อมูล');
+  const code = e.target.dataset.code;
+  const field = e.target.dataset.field;
+  const value = Number(e.target.value) || 0;
+  const {name, dept} = currentUser();
+  const part = partsCache[code];
+  const oldValue = part ? part[field] : undefined;
+  if(oldValue === value) return;
+  try{
+    await updateDoc(doc(db,'parts',code), {[field]: value, lastUpdatedBy:name, lastUpdatedAt: serverTimestamp()});
+    const fieldLabel = {stock:'สต๊อกคงเหลือ', pending:'ค้างส่ง', moq:'MOQ'}[field] || field;
+    await logActivity(name, dept, `แก้ไข${fieldLabel}ของ ${code} เป็น ${fmt(value)}`);
+  }catch(err){
+    console.error(err);
+    alert('บันทึกไม่สำเร็จ: ' + err.message);
+  }
+}
+
+async function logActivity(user, dept, action){
+  try{
+    await addDoc(collection(db,'activity'), {user, dept, action, ts: serverTimestamp()});
+  }catch(err){ console.error(err); }
+}
+
+// ---------------- modal / workflow ----------------
+function openModal(code){
+  const part = partsCache[code];
+  if(!part) return;
+  const q = activeQuarter;
+  const qState = part.quarters[q] || defaultQuarterState();
+  const totalStock = (part.stock||0) + (part.pending||0);
+  const forecastQ = part.forecast?.[q] || 0;
+  const recommended = ceilToMOQ(forecastQ - totalStock, part.moq||0);
+
+  document.getElementById('modalTitle').textContent = `${part.code} — ${part.name}`;
+  document.getElementById('modalSub').textContent = QUARTERS.find(x=>x.key===q).label;
+
+  const stepIdx = STATUS_FLOW.indexOf(qState.status);
+  const stepperHtml = STATUS_FLOW.map((s,i)=>{
+    let cls = 'step';
+    if(i < stepIdx) cls += ' done';
+    else if(i === stepIdx) cls += ' current';
+    return `<div class="${cls}">${STATUS_LABEL[s]}</div>`;
+  }).join('');
+
+  let actionHtml = '';
+  if(qState.status === 'need' || qState.status === 'requested'){
+    actionHtml += `
+      <div class="field-row">
+        <label>จำนวนที่ขอซื้อ (Planning) — แนะนำ ${fmt(recommended)}</label>
+        <input type="number" id="inpRequestedQty" value="${qState.requestedQty || recommended}">
+      </div>
+      <div class="field-row">
+        <label>หมายเหตุ</label>
+        <textarea id="inpRequestNote" rows="2">${escapeHtml(qState.note||'')}</textarea>
+      </div>
+      <div class="modal-actions">
+        <button class="btn" id="btnRequest">ยืนยันคำขอซื้อ (Planning)</button>
+      </div>`;
+  }
+  if(qState.status === 'requested' || qState.status === 'need'){
+    actionHtml += `<hr style="border:none;border-top:1px solid #eee;margin:14px 0;">
+      <div class="field-row">
+        <label>เลข PO</label>
+        <input type="text" id="inpPO" value="${escapeHtml(qState.poNumber||'')}">
+      </div>
+      <div class="field-row">
+        <label>จำนวนที่สั่งซื้อจริง</label>
+        <input type="number" id="inpOrderedQty" value="${qState.orderedQty || qState.requestedQty || recommended}">
+      </div>
+      <div class="modal-actions">
+        <button class="btn" id="btnOrder">บันทึกการสั่งซื้อ (จัดซื้อ)</button>
+      </div>`;
+  }
+  if(qState.status === 'ordered'){
+    actionHtml += `
+      <div class="field-row">
+        <label>จำนวนที่รับเข้าจริง</label>
+        <input type="number" id="inpReceivedQty" value="${qState.orderedQty||0}">
+      </div>
+      <div class="modal-actions">
+        <button class="btn" id="btnReceive">ยืนยันรับของเข้าสต๊อก (คลังอะไหล่)</button>
+      </div>`;
+  }
+  if(qState.status === 'received'){
+    actionHtml += `<div class="empty-hint" style="padding:14px 0;">รับของครบไตรมาสนี้แล้ว ✓</div>
+      <div class="modal-actions">
+        <button class="btn secondary" id="btnReopen">เปิดสถานะใหม่ (แก้ไข)</button>
+      </div>`;
+  }
+
+  document.getElementById('modalBody').innerHTML = `
+    <div class="stepper">${stepperHtml}</div>
+    <div class="info-grid">
+      <div><span>สต๊อกคงเหลือ+ค้างส่ง</span>${fmt(totalStock)}</div>
+      <div><span>Forecast ไตรมาสนี้</span>${fmt(forecastQ)}</div>
+      <div><span>MOQ</span>${fmt(part.moq)}</div>
+      <div><span>ยอดแนะนำสั่ง</span><b>${fmt(recommended)}</b></div>
+    </div>
+    ${actionHtml}
+  `;
+
+  document.getElementById('btnRequest')?.addEventListener('click', ()=> doRequest(code, q));
+  document.getElementById('btnOrder')?.addEventListener('click', ()=> doOrder(code, q));
+  document.getElementById('btnReceive')?.addEventListener('click', ()=> doReceive(code, q));
+  document.getElementById('btnReopen')?.addEventListener('click', ()=> doReopen(code, q));
+
+  document.getElementById('modalBackdrop').classList.add('show');
+}
+
+function closeModal(){ document.getElementById('modalBackdrop').classList.remove('show'); }
+document.getElementById('modalClose').addEventListener('click', closeModal);
+document.getElementById('modalBackdrop').addEventListener('click', (e)=>{ if(e.target.id==='modalBackdrop') closeModal(); });
+
+async function doRequest(code, q){
+  const {name, dept} = currentUser();
+  const qty = Number(document.getElementById('inpRequestedQty').value)||0;
+  const note = document.getElementById('inpRequestNote').value||'';
+  await updateDoc(doc(db,'parts',code), {
+    [`quarters.${q}.status`]:'requested',
+    [`quarters.${q}.requestedQty`]: qty,
+    [`quarters.${q}.requestedBy`]: name,
+    [`quarters.${q}.requestedAt`]: serverTimestamp(),
+    [`quarters.${q}.note`]: note
+  });
+  await logActivity(name, dept, `ขอซื้อ ${code} จำนวน ${fmt(qty)} (${QUARTERS.find(x=>x.key===q).label})`);
+  closeModal();
+}
+async function doOrder(code, q){
+  const {name, dept} = currentUser();
+  const po = document.getElementById('inpPO').value||'';
+  const qty = Number(document.getElementById('inpOrderedQty').value)||0;
+  await updateDoc(doc(db,'parts',code), {
+    [`quarters.${q}.status`]:'ordered',
+    [`quarters.${q}.poNumber`]: po,
+    [`quarters.${q}.orderedQty`]: qty,
+    [`quarters.${q}.orderedBy`]: name,
+    [`quarters.${q}.orderedAt`]: serverTimestamp()
+  });
+  await logActivity(name, dept, `สั่งซื้อ ${code} จำนวน ${fmt(qty)} PO#${po} (${QUARTERS.find(x=>x.key===q).label})`);
+  closeModal();
+}
+async function doReceive(code, q){
+  const {name, dept} = currentUser();
+  const qty = Number(document.getElementById('inpReceivedQty').value)||0;
+  const part = partsCache[code];
+  const newStock = (part.stock||0) + qty;
+  const newPending = Math.max((part.pending||0) - qty, 0);
+  await updateDoc(doc(db,'parts',code), {
+    [`quarters.${q}.status`]:'received',
+    [`quarters.${q}.receivedQty`]: qty,
+    [`quarters.${q}.receivedBy`]: name,
+    [`quarters.${q}.receivedAt`]: serverTimestamp(),
+    stock: newStock,
+    pending: newPending
+  });
+  await logActivity(name, dept, `รับของ ${code} จำนวน ${fmt(qty)} เข้าสต๊อก (${QUARTERS.find(x=>x.key===q).label})`);
+  closeModal();
+}
+async function doReopen(code, q){
+  const {name, dept} = currentUser();
+  await updateDoc(doc(db,'parts',code), {[`quarters.${q}.status`]:'ordered'});
+  await logActivity(name, dept, `เปิดสถานะ ${code} กลับไปแก้ไข (${QUARTERS.find(x=>x.key===q).label})`);
+  closeModal();
+}
+
+// ---------------- toolbar events ----------------
+document.getElementById('qtabs').addEventListener('click', (e)=>{
+  const btn = e.target.closest('button[data-q]');
+  if(!btn) return;
+  activeQuarter = btn.dataset.q;
+  document.querySelectorAll('#qtabs button').forEach(b=>b.classList.toggle('active', b===btn));
+  renderTable(); renderCards();
+});
+document.getElementById('filterbtns').addEventListener('click', (e)=>{
+  const btn = e.target.closest('button[data-f]');
+  if(!btn) return;
+  activeFilter = btn.dataset.f;
+  document.querySelectorAll('#filterbtns button').forEach(b=>b.classList.toggle('active', b===btn));
+  renderTable();
+});
+document.getElementById('searchBox').addEventListener('input', (e)=>{
+  searchTerm = e.target.value;
+  renderTable();
+});
+document.getElementById('userName').addEventListener('change', currentUser);
+document.getElementById('userDept').addEventListener('change', currentUser);
+
+// ---------------- seed / import ----------------
+document.getElementById('btnSeed').addEventListener('click', async ()=>{
+  if(!firebaseReady) return alert('ยังไม่ได้เชื่อมต่อฐานข้อมูล กรุณาตั้งค่า Firebase config ก่อน');
+  if(!confirm('จะโหลดข้อมูลเริ่มต้น 97 รายการจากไฟล์ Forcast proten.xlsx เข้าฐานข้อมูล\nรายการที่มีรหัสซ้ำอยู่แล้วจะถูกอัปเดตข้อมูลพื้นฐาน (สต๊อก/MOQ/Forecast) แต่จะไม่แตะสถานะสั่งซื้อที่มีอยู่\nดำเนินการต่อ?')) return;
+  const {name, dept} = currentUser();
+  const batch = writeBatch(db);
+  for(const p of SEED_DATA){
+    const ref = doc(db,'parts',p.code);
+    const existing = partsCache[p.code];
+    batch.set(ref, {
+      seq:p.seq, code:p.code, name:p.name, qtyPerSet:p.qtyPerSet,
+      stock:p.stock, pending:p.pending, moq: (existing && existing.moq) || 50,
+      forecast:p.forecast, productionCapacity:p.productionCapacity,
+      quarters: (existing && existing.quarters) || {
+        q3:defaultQuarterState(), q4:defaultQuarterState(), q1:defaultQuarterState(), q2:defaultQuarterState()
+      }
+    }, {merge:true});
+  }
+  await batch.commit();
+  await logActivity(name, dept, `โหลดข้อมูลเริ่มต้น ${SEED_DATA.length} รายการเข้าระบบ`);
+  alert('โหลดข้อมูลเริ่มต้นสำเร็จ');
+});
+
+document.getElementById('fileImport').addEventListener('change', async (e)=>{
+  if(!firebaseReady) return alert('ยังไม่ได้เชื่อมต่อฐานข้อมูล กรุณาตั้งค่า Firebase config ก่อน');
+  const file = e.target.files[0];
+  if(!file) return;
+  const buf = await file.arrayBuffer();
+  const wb = XLSX.read(buf, {type:'array'});
+  const sheetName = wb.SheetNames.find(n=> n.includes('Forecast')) || wb.SheetNames[0];
+  const ws = wb.Sheets[sheetName];
+  const rows = XLSX.utils.sheet_to_json(ws, {header:1, defval:null, range:2}); // skip 2 header rows
+
+  const {name, dept} = currentUser();
+  const batch = writeBatch(db);
+  let count = 0;
+  rows.forEach(r=>{
+    if(!r || !r[1] || r[0]==='รวมทุกรายการ') return;
+    const code = String(r[1]);
+    const existing = partsCache[code];
+    const data = {
+      seq: r[0], code, name: r[2], qtyPerSet: r[3]||0,
+      stock: r[4]||0, pending: r[5]||0,
+      moq: r[8] || (existing && existing.moq) || 50,
+      forecast: {q3:r[9]||0, q4:r[10]||0, q1:r[11]||0, q2:r[12]||0, total:r[13]||0},
+      productionCapacity: r[23]||0,
+      quarters: (existing && existing.quarters) || {
+        q3:defaultQuarterState(), q4:defaultQuarterState(), q1:defaultQuarterState(), q2:defaultQuarterState()
+      }
+    };
+    batch.set(doc(db,'parts',code), data, {merge:true});
+    count++;
+  });
+  await batch.commit();
+  await logActivity(name, dept, `นำเข้าข้อมูลจากไฟล์ Excel (${file.name}) จำนวน ${count} รายการ`);
+  alert(`นำเข้าข้อมูลสำเร็จ ${count} รายการ`);
+  e.target.value = '';
+});
+
+// ---------------- init ----------------
+loadUserFromStorage();
+</script>
+</body>
+</html>
