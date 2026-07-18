@@ -289,6 +289,8 @@ const QUARTERS = [
 const STATUS_FLOW = ['need','requested','ordered','received'];
 const STATUS_LABEL = {need:'ต้องสั่ง', requested:'ขอซื้อแล้ว', ordered:'สั่งซื้อแล้ว', received:'รับของแล้ว'};
 const DEPT_LABEL = {planning:'Planning', purchasing:'จัดซื้อ', warehouse:'คลังอะไหล่'};
+// ลำดับการเรียงตาราง: ต้องสั่งก่อนเสมอ (บนสุด) → กำลังดำเนินการ → รับของแล้ว/ไม่ต้องสั่ง (ล่างสุด)
+const SORT_PRIORITY = {need:0, requested:1, ordered:2, received:3, noneed:4};
 
 // ---------- ข้อมูลเริ่มต้นจากไฟล์ Forcast proten.xlsx (97 รายการ) ----------
 const SEED_DATA = [
@@ -3549,7 +3551,14 @@ function computeMonths(p){
 
 function renderTable(){
   const tbody = document.getElementById('tableBody');
-  let parts = Object.values(partsCache).sort((a,b)=> (a.seq||0)-(b.seq||0));
+  let parts = Object.values(partsCache).sort((a,b)=>{
+    const pa = SORT_PRIORITY[getBadgeInfo(a, activeQuarter).cls] ?? 9;
+    const pb = SORT_PRIORITY[getBadgeInfo(b, activeQuarter).cls] ?? 9;
+    if(pa !== pb) return pa - pb;
+    const ma = computeMonths(a), mb = computeMonths(b);
+    if(ma !== mb) return ma - mb;
+    return (a.seq||0) - (b.seq||0);
+  });
 
   if(searchTerm){
     const t = searchTerm.toLowerCase();
