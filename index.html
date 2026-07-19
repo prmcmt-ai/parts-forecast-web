@@ -223,10 +223,10 @@
             <th class="num">สต๊อก-สโตร์</th>
             <th class="num">ค้างส่ง</th>
             <th class="num">รวมสต๊อก</th>
-            <th class="num">MOQ</th>
+            <th class="num">ยอดใช้งาน</th>
             <th class="num">ใช้ได้อีก (ด.)</th>
             <th class="num">Forecast ไตรมาส</th>
-            <th class="num">ยอดใช้งาน</th>
+            <th class="num">MOQ</th>
             <th class="num">แนะนำสั่ง</th>
             <th>สถานะ</th>
             <th></th>
@@ -2451,10 +2451,10 @@ function renderTable(){
         <td class="num"><input class="editable" type="number" value="${p.stockStore||0}" data-field="stockStore" data-code="${p.code}"></td>
         <td class="num"><input class="editable" type="number" value="${p.pending||0}" data-field="pending" data-code="${p.code}"></td>
         <td class="num"><b>${fmt(getTotalStock(p))}</b></td>
-        <td class="num"><input class="editable" type="number" value="${p.moq||0}" data-field="moq" data-code="${p.code}"></td>
+        <td class="num"><input class="editable" type="number" value="${p.realDemand||0}" data-field="realDemand" data-code="${p.code}"></td>
         <td class="num"><span class="months-tag ${mClass}">${months>=999?'∞':months.toFixed(1)}</span></td>
         <td class="num">${fmt(forecastQ)}</td>
-        <td class="num"><input class="editable" type="number" value="${p.realDemand||0}" data-field="realDemand" data-code="${p.code}"></td>
+        <td class="num"><input class="editable" type="number" value="${p.moq||0}" data-field="moq" data-code="${p.code}"></td>
         <td class="num"><b>${recommended>0?fmt(recommended):'-'}</b></td>
         <td><span class="badge ${badgeClass}">${badgeLabel}</span></td>
         <td>
