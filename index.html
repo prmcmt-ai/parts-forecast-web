@@ -217,6 +217,7 @@
       <table>
         <thead>
           <tr>
+            <th class="num">ลำดับ</th>
             <th>รหัส / รายการ</th>
             <th class="num">สต๊อก-เชื่อม</th>
             <th class="num">สต๊อก-สโตร์</th>
@@ -225,13 +226,14 @@
             <th class="num">MOQ</th>
             <th class="num">ใช้ได้อีก (ด.)</th>
             <th class="num">Forecast ไตรมาส</th>
+            <th class="num">ยอดใช้งาน</th>
             <th class="num">แนะนำสั่ง</th>
             <th>สถานะ</th>
             <th></th>
           </tr>
         </thead>
         <tbody id="tableBody">
-          <tr><td colspan="11" class="empty-hint">กำลังโหลดข้อมูล...</td></tr>
+          <tr><td colspan="13" class="empty-hint">กำลังโหลดข้อมูล...</td></tr>
         </tbody>
       </table>
     </div>
@@ -294,29 +296,23 @@ const DEPT_LABEL = {planning:'Planning', purchasing:'จัดซื้อ', war
 // ลำดับการเรียงตาราง: ต้องสั่งก่อนเสมอ (บนสุด) → กำลังดำเนินการ → รับของแล้ว/ไม่ต้องสั่ง (ล่างสุด)
 const SORT_PRIORITY = {need:0, requested:1, ordered:2, received:3, noneed:4};
 
-// ---------- ยอดต้องการใช้จริง จากไฟล์ "ยอดงานโปรเท็น.xlsx" (งานไถ 7 จาน ยืนยันสั่งซื้อแล้ว 221 ชุด, Q3/69) ----------
-// ใช้เทียบ/ค้ำยันกับ Forecast (ประมาณการ) เพื่อให้ยอดแนะนำสั่งไม่ต่ำกว่าความต้องการจริงที่ยืนยันแล้ว
-const REAL_DEMAND = {
-  'DT320A':      {qty:442, quarter:'q3', label:'ยืนยันจริง (ไถ 7 จาน 221 ชุด)'},
-  'DT321A':      {qty:221, quarter:'q3', label:'ยืนยันจริง (ไถ 7 จาน 221 ชุด)'},
-  'DT322':       {qty:221, quarter:'q3', label:'ยืนยันจริง (ไถ 7 จาน 221 ชุด)'},
-  'DT323':       {qty:442, quarter:'q3', label:'ยืนยันจริง (ไถ 7 จาน 221 ชุด)'},
-  'DT324':       {qty:663, quarter:'q3', label:'ยืนยันจริง (ไถ 7 จาน 221 ชุด)'},
-  'DT325A':      {qty:221, quarter:'q3', label:'ยืนยันจริง (ไถ 7 จาน 221 ชุด)'},
-  'DT325B':      {qty:221, quarter:'q3', label:'ยืนยันจริง (ไถ 7 จาน 221 ชุด)'},
-  'DT329':       {qty:221, quarter:'q3', label:'ยืนยันจริง (ไถ 7 จาน 221 ชุด)'},
-  'DT330':       {qty:221, quarter:'q3', label:'ยืนยันจริง (ไถ 7 จาน 221 ชุด)'},
-  'DT331':       {qty:221, quarter:'q3', label:'ยืนยันจริง (ไถ 7 จาน 221 ชุด)'},
-  'DT332':       {qty:221, quarter:'q3', label:'ยืนยันจริง (ไถ 7 จาน 221 ชุด)'},
-  'DT333':       {qty:442, quarter:'q3', label:'ยืนยันจริง (ไถ 7 จาน 221 ชุด)'},
-  'DT334':       {qty:663, quarter:'q3', label:'ยืนยันจริง (ไถ 7 จาน 221 ชุด)'},
-  'M27-10-1202': {qty:221, quarter:'q3', label:'ยืนยันจริง (ไถ 7 จาน 221 ชุด)'},
-  'M27-10-1203': {qty:221, quarter:'q3', label:'ยืนยันจริง (ไถ 7 จาน 221 ชุด)'},
-  'DT120B':      {qty:221, quarter:'q3', label:'ยืนยันจริง (ไถ 7 จาน 221 ชุด)'}
-};
-function getRealDemand(p, quarter){
-  const rd = REAL_DEMAND[p.code];
-  return (rd && rd.quarter === quarter) ? rd : null;
+// "ยอดใช้งาน" (ยอดต้องการใช้จริงที่ยืนยันแล้ว) เก็บเป็นฟิลด์ realDemand ในเอกสารของแต่ละชิ้น
+// แก้ไขได้ตรงตารางเลย (คอลัมน์ "ยอดใช้งาน") ใช้เทียบ/ค้ำยันกับ Forecast เพื่อให้ยอดแนะนำสั่งไม่ต่ำกว่าความต้องการจริง
+function naturalCompare(a, b){
+  const ax = String(a||'').match(/\d+|\D+/g) || [];
+  const bx = String(b||'').match(/\d+|\D+/g) || [];
+  const len = Math.max(ax.length, bx.length);
+  for(let i=0;i<len;i++){
+    const as = ax[i] ?? '', bs = bx[i] ?? '';
+    const an = Number(as), bn = Number(bs);
+    const bothNum = as !== '' && bs !== '' && !isNaN(an) && !isNaN(bn);
+    if(bothNum){
+      if(an !== bn) return an - bn;
+    } else {
+      if(as !== bs) return as < bs ? -1 : 1;
+    }
+  }
+  return 0;
 }
 
 // ---------- ข้อมูลเริ่มต้นจากไฟล์ Forcast proten.xlsx (97 รายการ) ----------
@@ -2386,8 +2382,8 @@ function getTotalStock(p){
 function getRecommended(p, quarter){
   const totalStock = getTotalStock(p);
   const forecastQ = p.forecast?.[quarter] || 0;
-  const rd = getRealDemand(p, quarter);
-  const demandQ = rd ? Math.max(forecastQ, rd.qty) : forecastQ;
+  const realDemandQ = p.realDemand || 0;
+  const demandQ = Math.max(forecastQ, realDemandQ);
   return ceilToMOQ(demandQ - totalStock, p.moq||0);
 }
 function getBadgeInfo(p, quarter){
@@ -2423,9 +2419,7 @@ function renderTable(){
     const pa = SORT_PRIORITY[getBadgeInfo(a, activeQuarter).cls] ?? 9;
     const pb = SORT_PRIORITY[getBadgeInfo(b, activeQuarter).cls] ?? 9;
     if(pa !== pb) return pa - pb;
-    const ma = computeMonths(a), mb = computeMonths(b);
-    if(ma !== mb) return ma - mb;
-    return (a.seq||0) - (b.seq||0);
+    return naturalCompare(a.code, b.code);
   });
 
   if(searchTerm){
@@ -2439,19 +2433,19 @@ function renderTable(){
   }
 
   if(!parts.length){
-    tbody.innerHTML = '<tr><td colspan="11" class="empty-hint">ไม่พบข้อมูล — ลองกด "โหลดข้อมูลเริ่มต้น" ด้านบน หรือปรับตัวกรอง</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="13" class="empty-hint">ไม่พบข้อมูล — ลองกด "โหลดข้อมูลเริ่มต้น" ด้านบน หรือปรับตัวกรอง</td></tr>';
     return;
   }
 
-  tbody.innerHTML = parts.map(p=>{
+  tbody.innerHTML = parts.map((p, idx)=>{
     const months = computeMonths(p);
     const mClass = monthsClass(months);
     const forecastQ = p.forecast?.[activeQuarter] || 0;
     const recommended = getRecommended(p, activeQuarter);
     const {cls: badgeClass, label: badgeLabel} = getBadgeInfo(p, activeQuarter);
-    const realDemand = getRealDemand(p, activeQuarter);
     return `
       <tr data-code="${p.code}">
+        <td class="num" style="color:var(--muted);">${idx+1}</td>
         <td><div class="code">${p.code}</div><div class="name">${escapeHtml(p.name||'')}</div></td>
         <td class="num"><input class="editable" type="number" value="${p.stockWeld||0}" data-field="stockWeld" data-code="${p.code}"></td>
         <td class="num"><input class="editable" type="number" value="${p.stockStore||0}" data-field="stockStore" data-code="${p.code}"></td>
@@ -2459,7 +2453,8 @@ function renderTable(){
         <td class="num"><b>${fmt(getTotalStock(p))}</b></td>
         <td class="num"><input class="editable" type="number" value="${p.moq||0}" data-field="moq" data-code="${p.code}"></td>
         <td class="num"><span class="months-tag ${mClass}">${months>=999?'∞':months.toFixed(1)}</span></td>
-        <td class="num">${fmt(forecastQ)}${realDemand ? `<div style="font-size:11px;color:var(--red);margin-top:2px;" title="${realDemand.label}">จริง ${fmt(realDemand.qty)}</div>` : ''}</td>
+        <td class="num">${fmt(forecastQ)}</td>
+        <td class="num"><input class="editable" type="number" value="${p.realDemand||0}" data-field="realDemand" data-code="${p.code}"></td>
         <td class="num"><b>${recommended>0?fmt(recommended):'-'}</b></td>
         <td><span class="badge ${badgeClass}">${badgeLabel}</span></td>
         <td>
@@ -2515,7 +2510,7 @@ async function onFieldEdit(e){
   if(oldValue === value) return;
   try{
     await updateDoc(doc(db,'parts',code), {[field]: value, lastUpdatedBy:name, lastUpdatedAt: serverTimestamp()});
-    const fieldLabel = {stockWeld:'สต๊อก-แผนกเชื่อม', stockStore:'สต๊อก-สโตร์', pending:'ค้างส่ง', moq:'MOQ'}[field] || field;
+    const fieldLabel = {stockWeld:'สต๊อก-แผนกเชื่อม', stockStore:'สต๊อก-สโตร์', pending:'ค้างส่ง', moq:'MOQ', realDemand:'ยอดใช้งาน'}[field] || field;
     await logActivity(name, dept, `แก้ไข${fieldLabel}ของ ${code} เป็น ${fmt(value)}`);
   }catch(err){
     console.error(err);
@@ -2538,7 +2533,7 @@ function openModal(code){
   const totalStock = getTotalStock(part);
   const forecastQ = part.forecast?.[q] || 0;
   const recommended = getRecommended(part, q);
-  const realDemand = getRealDemand(part, q);
+  const realDemand = part.realDemand || 0;
 
   document.getElementById('modalTitle').textContent = `${part.code} — ${part.name}`;
   document.getElementById('modalSub').textContent = QUARTERS.find(x=>x.key===q).label;
@@ -2605,7 +2600,7 @@ function openModal(code){
       <div><span>MOQ</span>${fmt(part.moq)}</div>
       <div><span>ยอดแนะนำสั่ง</span><b>${fmt(recommended)}</b></div>
       <div><span>เบิกใช้จริงไตรมาสนี้</span>${fmt(qState.actualUsed||0)}</div>
-      ${realDemand ? `<div><span style="color:var(--red);">ยอดต้องการใช้จริง (${escapeHtml(realDemand.label)})</span><b style="color:var(--red);">${fmt(realDemand.qty)}</b></div>` : ''}
+      ${realDemand ? `<div><span style="color:var(--red);">ยอดใช้งาน (ยืนยันจริง)</span><b style="color:var(--red);">${fmt(realDemand)}</b></div>` : ''}
     </div>
     ${actionHtml}
   `;
