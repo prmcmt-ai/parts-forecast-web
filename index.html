@@ -94,6 +94,11 @@
   tbody tr:hover td.td-green{background:rgba(22,163,74,0.1);}
   tbody td{padding:8px; border-bottom:1px solid #f1f2f4; vertical-align:middle;}
   tbody tr:hover{background:#fafbfc;}
+  /* ไฮไลต์แถวที่รวมสต๊อกเป็น 0 - เฝ้าดูว่าควรยกเลิกผลิต หรือปรับ MOQ */
+  tr.row-zerostock td{background:var(--red-bg) !important;}
+  tr.row-zerostock td:first-child{box-shadow: inset 4px 0 0 var(--red);}
+  tr.row-zerostock:hover td{background:#fecdcd !important;}
+  .zerostock-tag{display:inline-block; font-size:10.5px; font-weight:600; color:var(--red); background:#fff; border:1px solid var(--red); border-radius:4px; padding:1px 5px; margin-left:6px; white-space:nowrap;}
   td.num, th.num{text-align:right;}
   .code{font-weight:700; color:var(--primary);}
   .name{color:#374151;}
@@ -2464,14 +2469,16 @@ function renderTable(){
     const recommended = getRecommended(p, activeQuarter);
     const excess = getExcessOverForecast(p, activeQuarter);
     const {cls: badgeClass, label: badgeLabel} = getBadgeInfo(p, activeQuarter);
+    const totalStock = getTotalStock(p);
+    const isZeroStock = totalStock === 0;
     return `
-      <tr data-code="${p.code}">
+      <tr data-code="${p.code}" class="${isZeroStock ? 'row-zerostock' : ''}">
         <td class="num" style="color:var(--muted);">${idx+1}</td>
-        <td><div class="code">${p.code}</div><div class="name">${escapeHtml(p.name||'')}</div></td>
+        <td><div class="code">${p.code}</div><div class="name">${escapeHtml(p.name||'')}${isZeroStock ? `<span class="zerostock-tag" title="สต๊อกรวมเป็น 0 - พิจารณายกเลิกผลิต หรือปรับ MOQ">สต๊อกหมด</span>` : ''}</div></td>
         <td class="num td-blue"><input class="editable" type="number" value="${p.stockWeld||0}" data-field="stockWeld" data-code="${p.code}"></td>
         <td class="num td-blue"><input class="editable" type="number" value="${p.stockStore||0}" data-field="stockStore" data-code="${p.code}"></td>
         <td class="num td-blue"><input class="editable" type="number" value="${p.pending||0}" data-field="pending" data-code="${p.code}"></td>
-        <td class="num td-blue"><b>${fmt(getTotalStock(p))}</b></td>
+        <td class="num td-blue"><b>${fmt(totalStock)}</b></td>
         <td class="num td-amber">
           <input class="editable" type="number" value="${p.realDemand||0}" data-field="realDemand" data-code="${p.code}">
           ${excess>0 ? `<div style="font-size:11px;color:var(--red);margin-top:2px;" title="ยอดใช้งานเกิน Forecast">⚠ เกิน +${fmt(excess)}</div>` : ''}
