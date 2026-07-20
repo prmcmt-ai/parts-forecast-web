@@ -290,6 +290,7 @@ const QUARTERS = [
   {key:'q1', label:'Q1/70 (ม.ค.-มี.ค.)'},
   {key:'q2', label:'Q2/70 (เม.ย.-มิ.ย.)'}
 ];
+const NEXT_QUARTER = {q3:'q4', q4:'q1', q1:'q2'}; // q2 เป็นไตรมาสสุดท้ายที่มีข้อมูลตอนนี้ ยังไม่มีไตรมาสถัดไปให้โยกยอด
 const STATUS_FLOW = ['need','requested','ordered','received'];
 const STATUS_LABEL = {need:'ต้องสั่ง', requested:'ขอซื้อแล้ว', ordered:'สั่งซื้อแล้ว', received:'รับของแล้ว'};
 const DEPT_LABEL = {planning:'Planning', purchasing:'จัดซื้อ', warehouse:'คลังอะไหล่'};
@@ -2386,6 +2387,12 @@ function getRecommended(p, quarter){
   const demandQ = Math.max(forecastQ, realDemandQ);
   return ceilToMOQ(demandQ - totalStock, p.moq||0);
 }
+// ยอดใช้งานจริง (ตามออเดอร์) เกิน Forecast ไตรมาสนี้ไปเท่าไหร่ - ใช้เตือน Planning ว่าออเดอร์เข้ามาเกินประมาณการ
+function getExcessOverForecast(p, quarter){
+  const forecastQ = p.forecast?.[quarter] || 0;
+  const realDemandQ = p.realDemand || 0;
+  return Math.max(0, realDemandQ - forecastQ);
+}
 function getBadgeInfo(p, quarter){
   const qState = p.quarters[quarter] || defaultQuarterState();
   if(qState.status === 'need'){
@@ -2442,6 +2449,7 @@ function renderTable(){
     const mClass = monthsClass(months);
     const forecastQ = p.forecast?.[activeQuarter] || 0;
     const recommended = getRecommended(p, activeQuarter);
+    const excess = getExcessOverForecast(p, activeQuarter);
     const {cls: badgeClass, label: badgeLabel} = getBadgeInfo(p, activeQuarter);
     return `
       <tr data-code="${p.code}">
@@ -2451,7 +2459,10 @@ function renderTable(){
         <td class="num"><input class="editable" type="number" value="${p.stockStore||0}" data-field="stockStore" data-code="${p.code}"></td>
         <td class="num"><input class="editable" type="number" value="${p.pending||0}" data-field="pending" data-code="${p.code}"></td>
         <td class="num"><b>${fmt(getTotalStock(p))}</b></td>
-        <td class="num"><input class="editable" type="number" value="${p.realDemand||0}" data-field="realDemand" data-code="${p.code}"></td>
+        <td class="num">
+          <input class="editable" type="number" value="${p.realDemand||0}" data-field="realDemand" data-code="${p.code}">
+          ${excess>0 ? `<div style="font-size:11px;color:var(--red);margin-top:2px;" title="ยอดใช้งานเกิน Forecast ไตรมาสนี้">⚠ เกิน +${fmt(excess)}</div>` : ''}
+        </td>
         <td class="num"><span class="months-tag ${mClass}">${months>=999?'∞':months.toFixed(1)}</span></td>
         <td class="num">${fmt(forecastQ)}</td>
         <td class="num"><input class="editable" type="number" value="${p.moq||0}" data-field="moq" data-code="${p.code}"></td>
@@ -2534,6 +2545,8 @@ function openModal(code){
   const forecastQ = part.forecast?.[q] || 0;
   const recommended = getRecommended(part, q);
   const realDemand = part.realDemand || 0;
+  const excess = getExcessOverForecast(part, q);
+  const nextQ = NEXT_QUARTER[q];
 
   document.getElementById('modalTitle').textContent = `${part.code} — ${part.name}`;
   document.getElementById('modalSub').textContent = QUARTERS.find(x=>x.key===q).label;
@@ -2602,6 +2615,15 @@ function openModal(code){
       <div><span>เบิกใช้จริงไตรมาสนี้</span>${fmt(qState.actualUsed||0)}</div>
       ${realDemand ? `<div><span style="color:var(--red);">ยอดใช้งาน (ยืนยันจริง)</span><b style="color:var(--red);">${fmt(realDemand)}</b></div>` : ''}
     </div>
+    ${excess>0 ? `
+      <div style="background:var(--red-bg); border:1px solid #fecaca; border-radius:8px; padding:10px 12px; margin-bottom:14px; font-size:13px;">
+        <div style="color:var(--red); font-weight:600; margin-bottom:4px;">⚠ ยอดใช้งานเกิน Forecast ไตรมาสนี้อยู่ ${fmt(excess)} ชิ้น (มีออเดอร์เข้ามาเกินประมาณการ)</div>
+        <div style="color:var(--muted); font-size:12px; margin-bottom:8px;">
+          ถ้าออเดอร์นี้เป็นงานที่ดึงมาจาก ${nextQ ? QUARTERS.find(x=>x.key===nextQ).label : 'ไตรมาสถัดไป'} มาทำก่อน สามารถโยกยอดส่วนเกินไปหักออกจาก Forecast ไตรมาสถัดไปได้ (ถ้าเป็นออเดอร์ใหม่เพิ่มขึ้นจริง ไม่ควรกดปุ่มนี้)
+        </div>
+        ${nextQ ? `<button class="btn secondary" id="btnShiftExcess" style="font-size:12px; padding:6px 10px;">โยกยอดเกิน ${fmt(excess)} ไปหัก Forecast ${QUARTERS.find(x=>x.key===nextQ).label}</button>` : `<div style="color:var(--muted); font-size:12px;">ไม่มีไตรมาสถัดไปให้โยกยอด (ไตรมาสสุดท้ายในระบบ)</div>`}
+      </div>
+    ` : ''}
     ${actionHtml}
   `;
 
@@ -2609,6 +2631,7 @@ function openModal(code){
   document.getElementById('btnOrder')?.addEventListener('click', ()=> doOrder(code, q));
   document.getElementById('btnReceive')?.addEventListener('click', ()=> doReceive(code, q));
   document.getElementById('btnReopen')?.addEventListener('click', ()=> doReopen(code, q));
+  document.getElementById('btnShiftExcess')?.addEventListener('click', ()=> doShiftExcessToNextQuarter(code, q));
 
   document.getElementById('modalBackdrop').classList.add('show');
 }
@@ -2778,6 +2801,28 @@ async function doReopen(code, q){
   await updateDoc(doc(db,'parts',code), {[`quarters.${q}.status`]:'ordered'});
   await logActivity(name, dept, `เปิดสถานะ ${code} กลับไปแก้ไข (${QUARTERS.find(x=>x.key===q).label})`);
   closeModal();
+}
+// โยกยอดใช้งานส่วนที่เกิน Forecast ไปหักลบออกจาก Forecast ไตรมาสถัดไป
+// ใช้เมื่อออเดอร์ที่เกินมาเป็นงานที่ "ดึงมาจากอนาคต" ทำก่อน ไม่ใช่ออเดอร์ใหม่ที่เพิ่มขึ้นจริง
+async function doShiftExcessToNextQuarter(code, q){
+  const part = partsCache[code];
+  if(!part) return;
+  const excess = getExcessOverForecast(part, q);
+  const nextQ = NEXT_QUARTER[q];
+  if(!nextQ || excess<=0) return;
+  const nextQLabel = QUARTERS.find(x=>x.key===nextQ).label;
+  const oldNextForecast = part.forecast?.[nextQ] || 0;
+  const newNextForecast = Math.max(0, oldNextForecast - excess);
+  if(!confirm(`ยืนยันโยกยอดเกิน ${fmt(excess)} ชิ้น ไปหักออกจาก Forecast ${nextQLabel}\nForecast ${nextQLabel} เดิม ${fmt(oldNextForecast)} → ใหม่ ${fmt(newNextForecast)}`)) return;
+  const {name, dept} = currentUser();
+  try{
+    await updateDoc(doc(db,'parts',code), {[`forecast.${nextQ}`]: newNextForecast});
+    await logActivity(name, dept, `โยกยอดเกิน ${fmt(excess)} ของ ${code} ไปหัก Forecast ${nextQLabel} (${fmt(oldNextForecast)} → ${fmt(newNextForecast)})`);
+    openModal(code);
+  }catch(err){
+    console.error(err);
+    alert('บันทึกไม่สำเร็จ: ' + err.message);
+  }
 }
 
 // ---------------- toolbar events ----------------
