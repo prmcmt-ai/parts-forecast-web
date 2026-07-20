@@ -232,13 +232,13 @@
           <tr>
             <th class="num">ลำดับ</th>
             <th>รหัส / รายการ</th>
-            <th class="num th-blue">สต๊อก-เชื่อม</th>
-            <th class="num th-blue">สต๊อก-สโตร์</th>
+            <th class="num th-blue" style="text-align:center; line-height:1.35;">สต๊อก<br>แผนกเชื่อม</th>
+            <th class="num th-blue" style="text-align:center; line-height:1.35;">สต๊อก<br>คลังแชมป์</th>
             <th class="num th-blue">ค้างส่ง</th>
             <th class="num th-blue">รวมสต๊อก</th>
             <th class="num th-amber">ยอดใช้งาน</th>
             <th class="num">ใช้ได้อีก (ด.)</th>
-            <th class="num th-purple">Forecast ไตรมาส</th>
+            <th class="num th-purple">Forecast</th>
             <th class="num th-purple">MOQ</th>
             <th class="num th-green">แนะนำสั่ง</th>
             <th>สถานะ</th>
@@ -2400,7 +2400,7 @@ function getRecommended(p, quarter){
   const demandQ = Math.max(forecastQ, realDemandQ);
   return ceilToMOQ(demandQ - totalStock, p.moq||0);
 }
-// ยอดใช้งานจริง (ตามออเดอร์) เกิน Forecast ไตรมาสนี้ไปเท่าไหร่ - ใช้เตือน Planning ว่าออเดอร์เข้ามาเกินประมาณการ
+// ยอดใช้งานจริง (ตามออเดอร์) เกิน Forecast ไปเท่าไหร่ - ใช้เตือน Planning ว่าออเดอร์เข้ามาเกินประมาณการ
 function getExcessOverForecast(p, quarter){
   const forecastQ = p.forecast?.[quarter] || 0;
   const realDemandQ = p.realDemand || 0;
@@ -2474,7 +2474,7 @@ function renderTable(){
         <td class="num td-blue"><b>${fmt(getTotalStock(p))}</b></td>
         <td class="num td-amber">
           <input class="editable" type="number" value="${p.realDemand||0}" data-field="realDemand" data-code="${p.code}">
-          ${excess>0 ? `<div style="font-size:11px;color:var(--red);margin-top:2px;" title="ยอดใช้งานเกิน Forecast ไตรมาสนี้">⚠ เกิน +${fmt(excess)}</div>` : ''}
+          ${excess>0 ? `<div style="font-size:11px;color:var(--red);margin-top:2px;" title="ยอดใช้งานเกิน Forecast">⚠ เกิน +${fmt(excess)}</div>` : ''}
         </td>
         <td class="num"><span class="months-tag ${mClass}">${months>=999?'∞':months.toFixed(1)}</span></td>
         <td class="num td-purple">${fmt(forecastQ)}</td>
@@ -2622,7 +2622,7 @@ function openModal(code){
     <div class="stepper">${stepperHtml}</div>
     <div class="info-grid">
       <div><span>สต๊อก(เชื่อม+สโตร์)+ค้างส่ง</span>${fmt(totalStock)}</div>
-      <div><span>Forecast ไตรมาสนี้ (ประมาณการ)</span>${fmt(forecastQ)}</div>
+      <div><span>Forecast (ประมาณการ)</span>${fmt(forecastQ)}</div>
       <div><span>MOQ</span>${fmt(part.moq)}</div>
       <div><span>ยอดแนะนำสั่ง</span><b>${fmt(recommended)}</b></div>
       <div><span>เบิกใช้จริงไตรมาสนี้</span>${fmt(qState.actualUsed||0)}</div>
@@ -2630,9 +2630,9 @@ function openModal(code){
     </div>
     ${excess>0 ? `
       <div style="background:var(--red-bg); border:1px solid #fecaca; border-radius:8px; padding:10px 12px; margin-bottom:14px; font-size:13px;">
-        <div style="color:var(--red); font-weight:600; margin-bottom:4px;">⚠ ยอดใช้งานเกิน Forecast ไตรมาสนี้อยู่ ${fmt(excess)} ชิ้น (มีออเดอร์เข้ามาเกินประมาณการ)</div>
+        <div style="color:var(--red); font-weight:600; margin-bottom:4px;">⚠ ยอดใช้งานเกิน Forecast อยู่ ${fmt(excess)} ชิ้น (มีออเดอร์เข้ามาเกินประมาณการ)</div>
         <div style="color:var(--muted); font-size:12px; margin-bottom:8px;">
-          ถ้าออเดอร์นี้เป็นงานที่ดึงมาจาก ${nextQ ? QUARTERS.find(x=>x.key===nextQ).label : 'ไตรมาสถัดไป'} มาทำก่อน สามารถโยกยอดส่วนเกินไปหักออกจาก Forecast ไตรมาสถัดไปได้ (ถ้าเป็นออเดอร์ใหม่เพิ่มขึ้นจริง ไม่ควรกดปุ่มนี้)
+          ถ้าออเดอร์นี้เป็นงานที่ดึงมาจาก ${nextQ ? QUARTERS.find(x=>x.key===nextQ).label : 'ไตรมาสถัดไป'} มาทำก่อน สามารถโยกยอดส่วนเกินไปหักออกจาก Forecast ถัดไปได้ (ถ้าเป็นออเดอร์ใหม่เพิ่มขึ้นจริง ไม่ควรกดปุ่มนี้)
         </div>
         ${nextQ ? `<button class="btn secondary" id="btnShiftExcess" style="font-size:12px; padding:6px 10px;">โยกยอดเกิน ${fmt(excess)} ไปหัก Forecast ${QUARTERS.find(x=>x.key===nextQ).label}</button>` : `<div style="color:var(--muted); font-size:12px;">ไม่มีไตรมาสถัดไปให้โยกยอด (ไตรมาสสุดท้ายในระบบ)</div>`}
       </div>
@@ -2815,7 +2815,7 @@ async function doReopen(code, q){
   await logActivity(name, dept, `เปิดสถานะ ${code} กลับไปแก้ไข (${QUARTERS.find(x=>x.key===q).label})`);
   closeModal();
 }
-// โยกยอดใช้งานส่วนที่เกิน Forecast ไปหักลบออกจาก Forecast ไตรมาสถัดไป
+// โยกยอดใช้งานส่วนที่เกิน Forecast ไปหักลบออกจาก Forecast ถัดไป
 // ใช้เมื่อออเดอร์ที่เกินมาเป็นงานที่ "ดึงมาจากอนาคต" ทำก่อน ไม่ใช่ออเดอร์ใหม่ที่เพิ่มขึ้นจริง
 async function doShiftExcessToNextQuarter(code, q){
   const part = partsCache[code];
