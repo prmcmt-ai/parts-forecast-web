@@ -2418,7 +2418,7 @@ function getBadgeInfo(p, quarter){
 function renderCards(){
   const parts = Object.values(partsCache);
   document.getElementById('cardTotal').textContent = parts.length || '-';
-  const urgent = parts.filter(p=> computeMonths(p) < 3).length;
+  const urgent = parts.filter(p=> { const b = getBadgeInfo(p, activeQuarter); return computeMonths(p) < 3 && b.cls !== 'received' && b.cls !== 'noneed'; }).length;
   document.getElementById('cardUrgent').textContent = parts.length ? urgent : '-';
   const pending = parts.filter(p=> { const b = getBadgeInfo(p, activeQuarter); return b.cls !== 'received' && b.cls !== 'noneed'; }).length;
   document.getElementById('cardPending').textContent = parts.length ? pending : '-';
@@ -2447,7 +2447,7 @@ function renderTable(){
     parts = parts.filter(p=> (p.code||'').toLowerCase().includes(t) || (p.name||'').toLowerCase().includes(t));
   }
   if(activeFilter === 'urgent'){
-    parts = parts.filter(p=> computeMonths(p) < 3);
+    parts = parts.filter(p=> { const b = getBadgeInfo(p, activeQuarter); return computeMonths(p) < 3 && b.cls !== 'received' && b.cls !== 'noneed'; });
   } else if(activeFilter === 'pending'){
     parts = parts.filter(p=> { const b = getBadgeInfo(p, activeQuarter); return b.cls !== 'received' && b.cls !== 'noneed'; });
   }
