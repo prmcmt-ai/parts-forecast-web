@@ -9,7 +9,7 @@
     --bg:#f4f6f8; --panel:#ffffff; --border:#e2e5ea; --text:#1f2937; --muted:#6b7280;
     --primary:#2563eb; --primary-dark:#1d4ed8; --green:#16a34a; --green-bg:#dcfce7;
     --amber:#d97706; --amber-bg:#fef3c7; --red:#dc2626; --red-bg:#fee2e2;
-    --blue-bg:#dbeafe; --gray-bg:#f3f4f6;
+    --blue-bg:#dbeafe; --gray-bg:#f3f4f6; --purple:#7c3aed; --purple-bg:#ede9fe;
     --shadow: 0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.04);
   }
   *{box-sizing:border-box;}
@@ -79,6 +79,19 @@
     background:#f9fafb; text-align:left; padding:9px 8px; border-bottom:1px solid var(--border);
     font-weight:600; color:#374151; white-space:nowrap;
   }
+  /* กลุ่มสีคอลัมน์: ฟ้า=สต๊อก, ส้ม=ยอดใช้งาน, ม่วง=Forecast/MOQ, เขียว=แนะนำสั่ง */
+  thead th.th-blue{background:var(--blue-bg); color:var(--primary-dark);}
+  thead th.th-amber{background:var(--amber-bg); color:var(--amber);}
+  thead th.th-purple{background:var(--purple-bg); color:var(--purple);}
+  thead th.th-green{background:var(--green-bg); color:#15803d;}
+  tbody td.td-blue{background:rgba(37,99,235,0.05);}
+  tbody td.td-amber{background:rgba(217,119,6,0.06);}
+  tbody td.td-purple{background:rgba(124,58,237,0.06);}
+  tbody td.td-green{background:rgba(22,163,74,0.06);}
+  tbody tr:hover td.td-blue{background:rgba(37,99,235,0.09);}
+  tbody tr:hover td.td-amber{background:rgba(217,119,6,0.1);}
+  tbody tr:hover td.td-purple{background:rgba(124,58,237,0.1);}
+  tbody tr:hover td.td-green{background:rgba(22,163,74,0.1);}
   tbody td{padding:8px; border-bottom:1px solid #f1f2f4; vertical-align:middle;}
   tbody tr:hover{background:#fafbfc;}
   td.num, th.num{text-align:right;}
@@ -219,15 +232,15 @@
           <tr>
             <th class="num">ลำดับ</th>
             <th>รหัส / รายการ</th>
-            <th class="num">สต๊อก-เชื่อม</th>
-            <th class="num">สต๊อก-สโตร์</th>
-            <th class="num">ค้างส่ง</th>
-            <th class="num">รวมสต๊อก</th>
-            <th class="num">ยอดใช้งาน</th>
+            <th class="num th-blue">สต๊อก-เชื่อม</th>
+            <th class="num th-blue">สต๊อก-สโตร์</th>
+            <th class="num th-blue">ค้างส่ง</th>
+            <th class="num th-blue">รวมสต๊อก</th>
+            <th class="num th-amber">ยอดใช้งาน</th>
             <th class="num">ใช้ได้อีก (ด.)</th>
-            <th class="num">Forecast ไตรมาส</th>
-            <th class="num">MOQ</th>
-            <th class="num">แนะนำสั่ง</th>
+            <th class="num th-purple">Forecast ไตรมาส</th>
+            <th class="num th-purple">MOQ</th>
+            <th class="num th-green">แนะนำสั่ง</th>
             <th>สถานะ</th>
             <th></th>
           </tr>
@@ -2455,18 +2468,18 @@ function renderTable(){
       <tr data-code="${p.code}">
         <td class="num" style="color:var(--muted);">${idx+1}</td>
         <td><div class="code">${p.code}</div><div class="name">${escapeHtml(p.name||'')}</div></td>
-        <td class="num"><input class="editable" type="number" value="${p.stockWeld||0}" data-field="stockWeld" data-code="${p.code}"></td>
-        <td class="num"><input class="editable" type="number" value="${p.stockStore||0}" data-field="stockStore" data-code="${p.code}"></td>
-        <td class="num"><input class="editable" type="number" value="${p.pending||0}" data-field="pending" data-code="${p.code}"></td>
-        <td class="num"><b>${fmt(getTotalStock(p))}</b></td>
-        <td class="num">
+        <td class="num td-blue"><input class="editable" type="number" value="${p.stockWeld||0}" data-field="stockWeld" data-code="${p.code}"></td>
+        <td class="num td-blue"><input class="editable" type="number" value="${p.stockStore||0}" data-field="stockStore" data-code="${p.code}"></td>
+        <td class="num td-blue"><input class="editable" type="number" value="${p.pending||0}" data-field="pending" data-code="${p.code}"></td>
+        <td class="num td-blue"><b>${fmt(getTotalStock(p))}</b></td>
+        <td class="num td-amber">
           <input class="editable" type="number" value="${p.realDemand||0}" data-field="realDemand" data-code="${p.code}">
           ${excess>0 ? `<div style="font-size:11px;color:var(--red);margin-top:2px;" title="ยอดใช้งานเกิน Forecast ไตรมาสนี้">⚠ เกิน +${fmt(excess)}</div>` : ''}
         </td>
         <td class="num"><span class="months-tag ${mClass}">${months>=999?'∞':months.toFixed(1)}</span></td>
-        <td class="num">${fmt(forecastQ)}</td>
-        <td class="num"><input class="editable" type="number" value="${p.moq||0}" data-field="moq" data-code="${p.code}"></td>
-        <td class="num"><b>${recommended>0?fmt(recommended):'-'}</b></td>
+        <td class="num td-purple">${fmt(forecastQ)}</td>
+        <td class="num td-purple"><input class="editable" type="number" value="${p.moq||0}" data-field="moq" data-code="${p.code}"></td>
+        <td class="num td-green"><b>${recommended>0?fmt(recommended):'-'}</b></td>
         <td><span class="badge ${badgeClass}">${badgeLabel}</span></td>
         <td>
           <div style="display:flex; flex-direction:column; gap:4px;">
