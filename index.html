@@ -2795,7 +2795,7 @@ function openReceiveModal(code){
   if(withdrawUnsub){ withdrawUnsub(); withdrawUnsub = null; }
 
   document.getElementById('modalTitle').textContent = `บันทึกรับเข้า — ${part.code} ${part.name}`;
-  document.getElementById('modalSub').textContent = `สต๊อก-เชื่อม: ${fmt(part.stockWeld||0)} · สต๊อก-คลังแชมป์: ${fmt(part.stockStore||0)}`;
+  document.getElementById('modalSub').textContent = `สต๊อก-เชื่อม: ${fmt(part.stockWeld||0)} · สต๊อก-คลังแชมป์: ${fmt(part.stockStore||0)} · ค้างส่ง: ${fmt(part.pending||0)}`;
 
   document.getElementById('modalBody').innerHTML = `
     <div class="field-row">
@@ -2805,6 +2805,7 @@ function openReceiveModal(code){
     <div class="field-row">
       <label>จำนวนที่รับเข้า</label>
       <input type="number" id="inpRQty" min="1" placeholder="เช่น 400">
+      ${part.pending>0 ? `<div style="font-size:11.5px; color:var(--muted); margin-top:4px;">มีค้างส่งอยู่ ${fmt(part.pending)} — ระบบจะตัดค้างส่งให้อัตโนมัติตามจำนวนที่รับเข้า</div>` : ''}
     </div>
     <div class="field-row">
       <label>อ้างอิง (เช่น เลข PO, ผู้ส่งของ)</label>
@@ -2854,12 +2855,16 @@ async function doLogReceive(code){
   if(qty <= 0) return alert('กรุณาระบุจำนวนที่รับเข้าให้ถูกต้อง');
 
   const {name, dept} = currentUser();
+  const part = partsCache[code];
+  const oldPending = part?.pending || 0;
+  const newPending = Math.max(oldPending - qty, 0);
   try{
     await addDoc(collection(db,'parts',code,'withdrawals'), {
       date, qty, department: ref, note, source:'stockStore', sourceLabel:'คลังแชมป์ (รับเข้า)', type:'receive', recordedBy:name, recordedAt: serverTimestamp()
     });
-    await updateDoc(doc(db,'parts',code), {stockStore: increment(qty)});
-    const actionMsg = `รับเข้าสต๊อก ${code} จำนวน ${fmt(qty)} หน่วย เข้าคลังแชมป์${ref?` (อ้างอิง: ${ref})`:''}`;
+    await updateDoc(doc(db,'parts',code), {stockStore: increment(qty), pending: newPending});
+    const pendingNote = oldPending>0 ? ` (ตัดค้างส่งจาก ${fmt(oldPending)} → ${fmt(newPending)})` : '';
+    const actionMsg = `รับเข้าสต๊อก ${code} จำนวน ${fmt(qty)} หน่วย เข้าคลังแชมป์${ref?` (อ้างอิง: ${ref})`:''}${pendingNote}`;
     await logActivity(name, dept, actionMsg);
     document.getElementById('inpRQty').value = '';
     document.getElementById('inpRRef').value = '';
