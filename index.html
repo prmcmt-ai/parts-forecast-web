@@ -2489,7 +2489,13 @@ function renderTable(){
         <td class="num td-blue"><b>${fmt(totalStock)}</b></td>
         <td class="num td-amber">
           <input class="editable" type="number" value="${p.realDemand||0}" data-field="realDemand" data-code="${p.code}">
-          ${excess>0 ? `<div style="font-size:11px;color:var(--red);margin-top:2px;" title="ยอดใช้งานเกิน Forecast">⚠ เกิน +${fmt(excess)}</div>` : ''}
+          ${excess>0 ? `
+            <div style="margin-top:5px; height:5px; border-radius:3px; overflow:hidden; display:flex;" title="สัดส่วนที่อยู่ในแผน (เหลือง) เทียบกับส่วนที่เกินแผน (แดง)">
+              <div style="width:${Math.max(0, Math.min(100, (forecastQ/(p.realDemand||1))*100))}%; background:var(--amber);"></div>
+              <div style="flex:1; background:var(--red);"></div>
+            </div>
+            <div style="margin-top:3px; font-size:11px; color:var(--red);">เกิน Forecast (${fmt(forecastQ)}) ${fmt(excess)} ชิ้น</div>
+          ` : ''}
         </td>
         <td class="num"><span class="months-tag ${mClass}">${months>=999?'∞':months.toFixed(1)}</span></td>
         <td class="num td-purple">${fmt(forecastQ)}</td>
