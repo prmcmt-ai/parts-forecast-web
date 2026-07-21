@@ -126,6 +126,8 @@
   .manage-btn:hover{background:var(--gray-bg);}
   .withdraw-btn{border-color:#bbf7d0; color:var(--green);}
   .withdraw-btn:hover{background:var(--green-bg);}
+  .receive-btn{border-color:#bfdbfe; color:var(--primary-dark);}
+  .receive-btn:hover{background:var(--blue-bg);}
 
   .sidebar h3{font-size:14px; margin:0; padding:12px 14px; border-bottom:1px solid var(--border);}
   #activityFeed{max-height:640px; overflow-y:auto; padding:6px 0;}
@@ -2491,6 +2493,7 @@ function renderTable(){
         <td>
           <div style="display:flex; flex-direction:column; gap:4px;">
             <button class="manage-btn" data-code="${p.code}" data-action="manage">จัดการ</button>
+            <button class="manage-btn receive-btn" data-code="${p.code}" data-action="receive">รับเข้า</button>
             <button class="manage-btn withdraw-btn" data-code="${p.code}" data-action="withdraw">เบิกใช้</button>
           </div>
         </td>
@@ -2505,6 +2508,9 @@ function renderTable(){
   });
   tbody.querySelectorAll('[data-action="withdraw"]').forEach(btn=>{
     btn.addEventListener('click', ()=> openWithdrawModal(btn.dataset.code));
+  });
+  tbody.querySelectorAll('[data-action="receive"]').forEach(btn=>{
+    btn.addEventListener('click', ()=> openReceiveModal(btn.dataset.code));
   });
 }
 
@@ -2728,7 +2734,9 @@ function openWithdrawModal(code){
     }
     histEl.innerHTML = snap.docs.map(d=>{
       const w = d.data();
-      const typeTag = w.type==='transfer' ? '<span style="color:var(--primary);font-weight:600;">[โอน]</span>' : '<span style="color:var(--green);font-weight:600;">[เบิกใช้จริง]</span>';
+      const typeTag = w.type==='receive' ? '<span style="color:var(--green);font-weight:600;">[รับเข้า]</span>'
+        : w.type==='transfer' ? '<span style="color:var(--primary);font-weight:600;">[โอน]</span>'
+        : '<span style="color:var(--amber);font-weight:600;">[เบิกใช้จริง]</span>';
       return `<div class="row">${typeTag} <b>${w.date||''}</b> — ${fmt(w.qty||0)} หน่วย — ${escapeHtml(w.sourceLabel||'')} — แผนก: ${escapeHtml(w.department||'-')} ${w.note?(' — '+escapeHtml(w.note)):''} <span style="color:var(--muted);">(${escapeHtml(w.recordedBy||'')})</span></div>`;
     }).join('');
   }, (err)=>console.error(err));
@@ -2774,6 +2782,88 @@ async function doLogWithdrawal(code){
     await logActivity(name, dept, actionMsg);
     document.getElementById('inpWQty').value = '';
     document.getElementById('inpWNote').value = '';
+  }catch(err){
+    console.error(err);
+    alert('บันทึกไม่สำเร็จ: ' + err.message);
+  }
+}
+
+// ---------------- บันทึกรับเข้าสต๊อก (คลังอะไหล่) ----------------
+function openReceiveModal(code){
+  const part = partsCache[code];
+  if(!part) return;
+  if(withdrawUnsub){ withdrawUnsub(); withdrawUnsub = null; }
+
+  document.getElementById('modalTitle').textContent = `บันทึกรับเข้า — ${part.code} ${part.name}`;
+  document.getElementById('modalSub').textContent = `สต๊อก-เชื่อม: ${fmt(part.stockWeld||0)} · สต๊อก-คลังแชมป์: ${fmt(part.stockStore||0)}`;
+
+  document.getElementById('modalBody').innerHTML = `
+    <div class="field-row">
+      <label>วันที่รับ</label>
+      <input type="date" id="inpRDate" value="${todayStr()}">
+    </div>
+    <div class="field-row">
+      <label>จำนวนที่รับเข้า</label>
+      <input type="number" id="inpRQty" min="1" placeholder="เช่น 400">
+    </div>
+    <div class="field-row">
+      <label>อ้างอิง (เช่น เลข PO, ผู้ส่งของ)</label>
+      <input type="text" id="inpRRef" placeholder="เช่น PO-1234, ซัพพลายเออร์ ก.">
+    </div>
+    <div class="field-row">
+      <label>หมายเหตุ (ถ้ามี)</label>
+      <textarea id="inpRNote" rows="2"></textarea>
+    </div>
+    <div class="modal-actions">
+      <button class="btn" id="btnLogReceive">บันทึกรับเข้า (คลังอะไหล่)</button>
+    </div>
+    <hr style="border:none;border-top:1px solid #eee;margin:16px 0 10px;">
+    <div style="font-size:12.5px; font-weight:600; color:var(--muted); margin-bottom:6px;">ประวัติความเคลื่อนไหวล่าสุด</div>
+    <div id="withdrawHistory" class="action-log"><div class="empty-hint" style="padding:10px 0;">กำลังโหลด...</div></div>
+  `;
+
+  document.getElementById('btnLogReceive').addEventListener('click', ()=> doLogReceive(code));
+
+  const q = query(collection(db,'parts',code,'withdrawals'), orderBy('date','desc'), limit(15));
+  withdrawUnsub = onSnapshot(q, (snap)=>{
+    const histEl = document.getElementById('withdrawHistory');
+    if(!histEl) return;
+    if(snap.empty){
+      histEl.innerHTML = '<div class="empty-hint" style="padding:10px 0;">ยังไม่มีประวัติความเคลื่อนไหว</div>';
+      return;
+    }
+    histEl.innerHTML = snap.docs.map(d=>{
+      const w = d.data();
+      const typeTag = w.type==='receive' ? '<span style="color:var(--green);font-weight:600;">[รับเข้า]</span>'
+        : w.type==='transfer' ? '<span style="color:var(--primary);font-weight:600;">[โอน]</span>'
+        : '<span style="color:var(--amber);font-weight:600;">[เบิกใช้จริง]</span>';
+      return `<div class="row">${typeTag} <b>${w.date||''}</b> — ${fmt(w.qty||0)} หน่วย — ${escapeHtml(w.sourceLabel||'')} — ${w.department?('แผนก: '+escapeHtml(w.department)+' '):''}${w.note?(' — '+escapeHtml(w.note)):''} <span style="color:var(--muted);">(${escapeHtml(w.recordedBy||'')})</span></div>`;
+    }).join('');
+  }, (err)=>console.error(err));
+
+  document.getElementById('modalBackdrop').classList.add('show');
+}
+
+async function doLogReceive(code){
+  if(!firebaseReady) return alert('ยังไม่ได้เชื่อมต่อฐานข้อมูล');
+  const date = document.getElementById('inpRDate').value;
+  const qty = Number(document.getElementById('inpRQty').value) || 0;
+  const ref = document.getElementById('inpRRef').value.trim();
+  const note = document.getElementById('inpRNote').value.trim();
+  if(!date) return alert('กรุณาระบุวันที่รับ');
+  if(qty <= 0) return alert('กรุณาระบุจำนวนที่รับเข้าให้ถูกต้อง');
+
+  const {name, dept} = currentUser();
+  try{
+    await addDoc(collection(db,'parts',code,'withdrawals'), {
+      date, qty, department: ref, note, source:'stockStore', sourceLabel:'คลังแชมป์ (รับเข้า)', type:'receive', recordedBy:name, recordedAt: serverTimestamp()
+    });
+    await updateDoc(doc(db,'parts',code), {stockStore: increment(qty)});
+    const actionMsg = `รับเข้าสต๊อก ${code} จำนวน ${fmt(qty)} หน่วย เข้าคลังแชมป์${ref?` (อ้างอิง: ${ref})`:''}`;
+    await logActivity(name, dept, actionMsg);
+    document.getElementById('inpRQty').value = '';
+    document.getElementById('inpRRef').value = '';
+    document.getElementById('inpRNote').value = '';
   }catch(err){
     console.error(err);
     alert('บันทึกไม่สำเร็จ: ' + err.message);
