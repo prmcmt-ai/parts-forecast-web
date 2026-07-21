@@ -2684,10 +2684,10 @@ function openWithdrawModal(code){
       <input type="date" id="inpWDate" value="${todayStr()}">
     </div>
     <div class="field-row">
-      <label>เบิกจากสต๊อก</label>
+      <label>ประเภทรายการ</label>
       <select id="inpWSource">
-        <option value="stockStore">สโตร์ (คงเหลือ ${fmt(part.stockStore||0)})</option>
-        <option value="stockWeld">แผนกเชื่อม (คงเหลือ ${fmt(part.stockWeld||0)})</option>
+        <option value="stockStore">โอนจากคลังแชมป์ → แผนกเชื่อม (คงเหลือคลังแชมป์ ${fmt(part.stockStore||0)})</option>
+        <option value="stockWeld">เบิกใช้จริงจากแผนกเชื่อม (คงเหลือแผนกเชื่อม ${fmt(part.stockWeld||0)})</option>
       </select>
     </div>
     <div class="field-row">
@@ -2709,7 +2709,7 @@ function openWithdrawModal(code){
       <textarea id="inpWNote" rows="2"></textarea>
     </div>
     <div class="modal-actions">
-      <button class="btn" id="btnLogWithdraw">บันทึกการเบิกใช้ (คลังอะไหล่)</button>
+      <button class="btn" id="btnLogWithdraw">บันทึกรายการ (คลังอะไหล่)</button>
     </div>
     <hr style="border:none;border-top:1px solid #eee;margin:16px 0 10px;">
     <div style="font-size:12.5px; font-weight:600; color:var(--muted); margin-bottom:6px;">ประวัติการเบิกใช้ล่าสุด</div>
@@ -2728,7 +2728,8 @@ function openWithdrawModal(code){
     }
     histEl.innerHTML = snap.docs.map(d=>{
       const w = d.data();
-      return `<div class="row"><b>${w.date||''}</b> — ${fmt(w.qty||0)} หน่วย จาก${escapeHtml(w.sourceLabel||'สโตร์')} — แผนก: ${escapeHtml(w.department||'-')} ${w.note?(' — '+escapeHtml(w.note)):''} <span style="color:var(--muted);">(${escapeHtml(w.recordedBy||'')})</span></div>`;
+      const typeTag = w.type==='transfer' ? '<span style="color:var(--primary);font-weight:600;">[โอน]</span>' : '<span style="color:var(--green);font-weight:600;">[เบิกใช้จริง]</span>';
+      return `<div class="row">${typeTag} <b>${w.date||''}</b> — ${fmt(w.qty||0)} หน่วย — ${escapeHtml(w.sourceLabel||'')} — แผนก: ${escapeHtml(w.department||'-')} ${w.note?(' — '+escapeHtml(w.note)):''} <span style="color:var(--muted);">(${escapeHtml(w.recordedBy||'')})</span></div>`;
     }).join('');
   }, (err)=>console.error(err));
 
@@ -2747,22 +2748,30 @@ async function doLogWithdrawal(code){
   if(!department) return alert('กรุณาระบุแผนกที่เบิกไปใช้');
 
   const part = partsCache[code];
-  const sourceLabel = source === 'stockWeld' ? 'แผนกเชื่อม' : 'สโตร์';
+  const isTransfer = source === 'stockStore';
+  const sourceLabel = isTransfer ? 'คลังแชมป์ (โอนไปแผนกเชื่อม)' : 'แผนกเชื่อม (เบิกใช้จริง)';
   const availableQty = part ? (part[source]||0) : 0;
   if(part && qty > availableQty){
-    if(!confirm(`จำนวนที่เบิก (${fmt(qty)}) มากกว่าสต๊อก-${sourceLabel} คงเหลือ (${fmt(availableQty)}) ต้องการบันทึกต่อหรือไม่?`)) return;
+    if(!confirm(`จำนวนที่เบิก (${fmt(qty)}) มากกว่าคงเหลือ-${sourceLabel} (${fmt(availableQty)}) ต้องการบันทึกต่อหรือไม่?`)) return;
   }
 
   const {name, dept} = currentUser();
   try{
     await addDoc(collection(db,'parts',code,'withdrawals'), {
-      date, qty, department, note, source, sourceLabel, recordedBy:name, recordedAt: serverTimestamp()
+      date, qty, department, note, source, sourceLabel, type: isTransfer?'transfer':'use', recordedBy:name, recordedAt: serverTimestamp()
     });
-    const updates = {[source]: increment(-qty)};
-    const qKey = dateToQuarterKey(date);
-    if(qKey){ updates[`quarters.${qKey}.actualUsed`] = increment(qty); }
+    const updates = isTransfer
+      ? {stockStore: increment(-qty), stockWeld: increment(qty)}
+      : {stockWeld: increment(-qty)};
+    if(!isTransfer){
+      const qKey = dateToQuarterKey(date);
+      if(qKey){ updates[`quarters.${qKey}.actualUsed`] = increment(qty); }
+    }
     await updateDoc(doc(db,'parts',code), updates);
-    await logActivity(name, dept, `บันทึกเบิกใช้ ${code} จำนวน ${fmt(qty)} จากสต๊อก-${sourceLabel} ให้แผนก "${department}" (วันที่ ${date})`);
+    const actionMsg = isTransfer
+      ? `โอนสต๊อก ${code} จากคลังแชมป์ไปแผนกเชื่อม ${fmt(qty)} หน่วย (ปลายทาง: แผนก "${department}")`
+      : `เบิกใช้จริง ${code} จำนวน ${fmt(qty)} จากแผนกเชื่อม ให้แผนก "${department}" (วันที่ ${date})`;
+    await logActivity(name, dept, actionMsg);
     document.getElementById('inpWQty').value = '';
     document.getElementById('inpWNote').value = '';
   }catch(err){
