@@ -302,7 +302,7 @@ const firebaseConfig = {
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import {
   getFirestore, collection, doc, setDoc, updateDoc, onSnapshot,
-  addDoc, serverTimestamp, query, orderBy, limit, writeBatch, getDoc, increment, deleteField
+  addDoc, serverTimestamp, query, orderBy, limit, writeBatch, getDoc, increment, deleteField, deleteDoc
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
@@ -2752,20 +2752,65 @@ function openWithdrawModal(code){
       histEl.innerHTML = '<div class="empty-hint" style="padding:10px 0;">ยังไม่มีประวัติการเบิกใช้</div>';
       return;
     }
-    histEl.innerHTML = snap.docs.map(d=>{
-      const w = d.data();
-      const typeTag = w.type==='receive' ? '<span style="color:var(--green);font-weight:600;">[รับเข้า]</span>'
-        : w.type==='transfer' ? '<span style="color:var(--primary);font-weight:600;">[โอน]</span>'
-        : '<span style="color:var(--amber);font-weight:600;">[เบิกใช้จริง]</span>';
-      return `<div class="row">${typeTag} <b>${w.date||''}</b> — ${fmt(w.qty||0)} หน่วย — ${escapeHtml(w.sourceLabel||'')} — แผนก: ${escapeHtml(w.department||'-')} ${w.note?(' — '+escapeHtml(w.note)):''} <span style="color:var(--muted);">(${escapeHtml(w.recordedBy||'')})</span></div>`;
-    }).join('');
+    histEl.innerHTML = snap.docs.map(d=> renderMovementRow(d)).join('');
   }, (err)=>console.error(err));
+  document.getElementById('withdrawHistory').addEventListener('click', (e)=>{
+    const btn = e.target.closest('.undo-btn');
+    if(!btn) return;
+    undoMovement(code, btn.dataset.id);
+  });
 
   document.getElementById('modalBackdrop').classList.add('show');
 }
 
+function renderMovementRow(d){
+  const w = d.data();
+  const typeTag = w.type==='receive' ? '<span style="color:var(--green);font-weight:600;">[รับเข้า]</span>'
+    : w.type==='transfer' ? '<span style="color:var(--primary);font-weight:600;">[โอน]</span>'
+    : '<span style="color:var(--amber);font-weight:600;">[เบิกใช้จริง]</span>';
+  return `<div class="row" style="display:flex; align-items:center; justify-content:space-between; gap:8px;">
+    <div>${typeTag} <b>${w.date||''}</b> — ${fmt(w.qty||0)} หน่วย — ${escapeHtml(w.sourceLabel||'')} ${w.department?('— แผนก: '+escapeHtml(w.department)+' '):''}${w.note?(' — '+escapeHtml(w.note)):''} <span style="color:var(--muted);">(${escapeHtml(w.recordedBy||'')})</span></div>
+    <button class="undo-btn" data-id="${d.id}" style="font-size:11px; padding:2px 8px; border:1px solid var(--border); border-radius:4px; background:#fff; cursor:pointer; color:var(--red); white-space:nowrap; flex-shrink:0;">ยกเลิก</button>
+  </div>`;
+}
+
+async function undoMovement(code, movementId){
+  if(!firebaseReady) return alert('ยังไม่ได้เชื่อมต่อฐานข้อมูล');
+  try{
+    const mRef = doc(db,'parts',code,'withdrawals',movementId);
+    const mSnap = await getDoc(mRef);
+    if(!mSnap.exists()){ alert('ไม่พบรายการนี้แล้ว (อาจถูกยกเลิกไปก่อนหน้านี้)'); return; }
+    const m = mSnap.data();
+    const typeLabel = m.type==='receive' ? 'รับเข้า' : m.type==='transfer' ? 'โอน' : 'เบิกใช้จริง';
+    if(!confirm(`ยืนยันยกเลิกรายการ "${typeLabel}" จำนวน ${fmt(m.qty)} หน่วย วันที่ ${m.date}?\nระบบจะย้อนตัวเลขสต๊อกที่เกี่ยวข้องกลับให้อัตโนมัติ`)) return;
+    const {name, dept} = currentUser();
+    const updates = {};
+    if(m.type === 'receive'){
+      updates.stockStore = increment(-(m.qty||0));
+      if(typeof m.pendingDelta === 'number'){
+        updates.pending = increment(-m.pendingDelta);
+      }
+    } else if(m.type === 'transfer'){
+      updates.stockStore = increment(m.qty||0);
+      updates.stockWeld = increment(-(m.qty||0));
+    } else {
+      updates.stockWeld = increment(m.qty||0);
+      const qKey = dateToQuarterKey(m.date);
+      if(qKey){ updates[`quarters.${qKey}.actualUsed`] = increment(-(m.qty||0)); }
+    }
+    await updateDoc(doc(db,'parts',code), updates);
+    await deleteDoc(mRef);
+    await logActivity(name, dept, `ยกเลิกรายการ${typeLabel} ${code} จำนวน ${fmt(m.qty||0)} หน่วย วันที่ ${m.date} (บันทึกผิดพลาด/ซ้ำ)`);
+  }catch(err){
+    console.error(err);
+    alert('ยกเลิกไม่สำเร็จ: ' + err.message);
+  }
+}
+
 async function doLogWithdrawal(code){
   if(!firebaseReady) return alert('ยังไม่ได้เชื่อมต่อฐานข้อมูล');
+  const btnW = document.getElementById('btnLogWithdraw');
+  if(btnW && btnW.disabled) return;
   const date = document.getElementById('inpWDate').value;
   const source = document.getElementById('inpWSource').value; // 'stockStore' หรือ 'stockWeld'
   const qty = Number(document.getElementById('inpWQty').value) || 0;
@@ -2784,6 +2829,7 @@ async function doLogWithdrawal(code){
   }
 
   const {name, dept} = currentUser();
+  if(btnW){ btnW.disabled = true; btnW.textContent = 'กำลังบันทึก...'; }
   try{
     await addDoc(collection(db,'parts',code,'withdrawals'), {
       date, qty, department, note, source, sourceLabel, type: isTransfer?'transfer':'use', recordedBy:name, recordedAt: serverTimestamp()
@@ -2805,6 +2851,8 @@ async function doLogWithdrawal(code){
   }catch(err){
     console.error(err);
     alert('บันทึกไม่สำเร็จ: ' + err.message);
+  }finally{
+    if(btnW){ btnW.disabled = false; btnW.textContent = 'บันทึกรายการ (คลังอะไหล่)'; }
   }
 }
 
@@ -2853,20 +2901,21 @@ function openReceiveModal(code){
       histEl.innerHTML = '<div class="empty-hint" style="padding:10px 0;">ยังไม่มีประวัติความเคลื่อนไหว</div>';
       return;
     }
-    histEl.innerHTML = snap.docs.map(d=>{
-      const w = d.data();
-      const typeTag = w.type==='receive' ? '<span style="color:var(--green);font-weight:600;">[รับเข้า]</span>'
-        : w.type==='transfer' ? '<span style="color:var(--primary);font-weight:600;">[โอน]</span>'
-        : '<span style="color:var(--amber);font-weight:600;">[เบิกใช้จริง]</span>';
-      return `<div class="row">${typeTag} <b>${w.date||''}</b> — ${fmt(w.qty||0)} หน่วย — ${escapeHtml(w.sourceLabel||'')} — ${w.department?('แผนก: '+escapeHtml(w.department)+' '):''}${w.note?(' — '+escapeHtml(w.note)):''} <span style="color:var(--muted);">(${escapeHtml(w.recordedBy||'')})</span></div>`;
-    }).join('');
+    histEl.innerHTML = snap.docs.map(d=> renderMovementRow(d)).join('');
   }, (err)=>console.error(err));
+  document.getElementById('withdrawHistory').addEventListener('click', (e)=>{
+    const btn = e.target.closest('.undo-btn');
+    if(!btn) return;
+    undoMovement(code, btn.dataset.id);
+  });
 
   document.getElementById('modalBackdrop').classList.add('show');
 }
 
 async function doLogReceive(code){
   if(!firebaseReady) return alert('ยังไม่ได้เชื่อมต่อฐานข้อมูล');
+  const btn = document.getElementById('btnLogReceive');
+  if(btn && btn.disabled) return;
   const date = document.getElementById('inpRDate').value;
   const qty = Number(document.getElementById('inpRQty').value) || 0;
   const ref = document.getElementById('inpRRef').value.trim();
@@ -2878,9 +2927,11 @@ async function doLogReceive(code){
   const part = partsCache[code];
   const oldPending = part?.pending || 0;
   const newPending = Math.max(oldPending - qty, 0);
+  const pendingDelta = newPending - oldPending;
+  if(btn){ btn.disabled = true; btn.textContent = 'กำลังบันทึก...'; }
   try{
     await addDoc(collection(db,'parts',code,'withdrawals'), {
-      date, qty, department: ref, note, source:'stockStore', sourceLabel:'คลังแชมป์ (รับเข้า)', type:'receive', recordedBy:name, recordedAt: serverTimestamp()
+      date, qty, department: ref, note, source:'stockStore', sourceLabel:'คลังแชมป์ (รับเข้า)', type:'receive', pendingDelta, recordedBy:name, recordedAt: serverTimestamp()
     });
     await updateDoc(doc(db,'parts',code), {stockStore: increment(qty), pending: newPending});
     const pendingNote = oldPending>0 ? ` (ตัดค้างส่งจาก ${fmt(oldPending)} → ${fmt(newPending)})` : '';
@@ -2892,6 +2943,8 @@ async function doLogReceive(code){
   }catch(err){
     console.error(err);
     alert('บันทึกไม่สำเร็จ: ' + err.message);
+  }finally{
+    if(btn){ btn.disabled = false; btn.textContent = 'บันทึกรับเข้า (คลังอะไหล่)'; }
   }
 }
 
