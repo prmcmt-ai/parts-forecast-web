@@ -246,6 +246,7 @@
             <th class="num th-amber">ยอดใช้งาน</th>
             <th class="num">ใช้ได้อีก (ด.)</th>
             <th class="num th-purple">Forecast</th>
+            <th class="num th-purple" style="text-align:center; line-height:1.35;">Forecast<br><span id="thNextForecastLabel">ถัดไป</span></th>
             <th class="num th-purple">MOQ</th>
             <th class="num th-green">แนะนำสั่ง</th>
             <th>สถานะ</th>
@@ -253,7 +254,7 @@
           </tr>
         </thead>
         <tbody id="tableBody">
-          <tr><td colspan="13" class="empty-hint">กำลังโหลดข้อมูล...</td></tr>
+          <tr><td colspan="14" class="empty-hint">กำลังโหลดข้อมูล...</td></tr>
         </tbody>
       </table>
     </div>
@@ -2442,6 +2443,10 @@ function computeMonths(p){
 
 function renderTable(){
   const tbody = document.getElementById('tableBody');
+  const nextQKey = NEXT_QUARTER[activeQuarter];
+  const nextQLabelShort = nextQKey ? QUARTERS.find(x=>x.key===nextQKey).label.split(' ')[0] : '-';
+  const thNextLabel = document.getElementById('thNextForecastLabel');
+  if(thNextLabel) thNextLabel.textContent = nextQLabelShort;
   let parts = Object.values(partsCache).sort((a,b)=>{
     const pa = SORT_PRIORITY[getBadgeInfo(a, activeQuarter).cls] ?? 9;
     const pb = SORT_PRIORITY[getBadgeInfo(b, activeQuarter).cls] ?? 9;
@@ -2460,7 +2465,7 @@ function renderTable(){
   }
 
   if(!parts.length){
-    tbody.innerHTML = '<tr><td colspan="13" class="empty-hint">ไม่พบข้อมูล — ลองกด "โหลดข้อมูลเริ่มต้น" ด้านบน หรือปรับตัวกรอง</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="14" class="empty-hint">ไม่พบข้อมูล — ลองกด "โหลดข้อมูลเริ่มต้น" ด้านบน หรือปรับตัวกรอง</td></tr>';
     return;
   }
 
@@ -2473,6 +2478,7 @@ function renderTable(){
     const {cls: badgeClass, label: badgeLabel} = getBadgeInfo(p, activeQuarter);
     const totalStock = getTotalStock(p);
     const isZeroStock = totalStock === 0;
+    const nextForecastQ = nextQKey ? (p.forecast?.[nextQKey] || 0) : null;
     return `
       <tr data-code="${p.code}" class="${isZeroStock ? 'row-zerostock' : ''}">
         <td class="num" style="color:var(--muted);">${idx+1}</td>
@@ -2487,6 +2493,7 @@ function renderTable(){
         </td>
         <td class="num"><span class="months-tag ${mClass}">${months>=999?'∞':months.toFixed(1)}</span></td>
         <td class="num td-purple">${fmt(forecastQ)}</td>
+        <td class="num td-purple" style="color:var(--muted);">${nextQKey ? fmt(nextForecastQ) : '-'}</td>
         <td class="num td-purple"><input class="editable" type="number" value="${p.moq||0}" data-field="moq" data-code="${p.code}"></td>
         <td class="num td-green"><b>${recommended>0?fmt(recommended):'-'}</b></td>
         <td><span class="badge ${badgeClass}">${badgeLabel}</span></td>
