@@ -99,6 +99,7 @@
   tr.row-zerostock td:first-child{box-shadow: inset 4px 0 0 var(--red);}
   tr.row-zerostock:hover td{background:#fecdcd !important;}
   .zerostock-tag{display:inline-block; font-size:10.5px; font-weight:600; color:var(--red); background:#fff; border:1px solid var(--red); border-radius:4px; padding:1px 5px; margin-left:6px; white-space:nowrap;}
+  .leadtime-tag{display:inline-block; font-size:10.5px; font-weight:600; color:var(--amber); background:#fff; border:1px solid var(--amber); border-radius:4px; padding:1px 5px; margin-left:6px; white-space:nowrap;}
   td.num, th.num{text-align:right;}
   .code{font-weight:700; color:var(--primary);}
   .name{color:#374151;}
@@ -2482,10 +2483,13 @@ function renderTable(){
     const totalStock = getTotalStock(p);
     const isZeroStock = totalStock === 0;
     const nextForecastQ = nextQKey ? (p.forecast?.[nextQKey] || 0) : null;
+    const qState = p.quarters?.[activeQuarter];
+    const alreadyCommitted = qState && (qState.status === 'ordered' || qState.status === 'received');
+    const showLeadTimeWarning = excess > 0 && alreadyCommitted;
     return `
       <tr data-code="${p.code}" class="${isZeroStock ? 'row-zerostock' : ''}">
         <td class="num" style="color:var(--muted);">${idx+1}</td>
-        <td><div class="code">${p.code}</div><div class="name">${escapeHtml(p.name||'')}${isZeroStock ? `<span class="zerostock-tag" title="สต๊อกรวมเป็น 0 - พิจารณายกเลิกผลิต หรือปรับ MOQ">สต๊อกหมด</span>` : ''}</div></td>
+        <td><div class="code">${p.code}</div><div class="name">${escapeHtml(p.name||'')}${isZeroStock ? `<span class="zerostock-tag" title="สต๊อกรวมเป็น 0 - พิจารณายกเลิกผลิต หรือปรับ MOQ">สต๊อกหมด</span>` : ''}${showLeadTimeWarning ? `<span class="leadtime-tag" title="สั่งซื้อ ${currentQLabelShort} เต็มจำนวนแล้ว แต่ยอดใช้งานจริงยังเกิน Forecast อยู่ แนะนำให้เร่งดึงยอด Forecast ${nextQLabelShort} มาสั่งล่วงหน้า เนื่องจาก Lead time ประมาณ 1-2 เดือน">สั่งครบ ${currentQLabelShort} แล้วไม่พอ - เร่งดึง ${nextQLabelShort}</span>` : ''}</div></td>
         <td class="num td-blue"><input class="editable" type="number" value="${p.stockWeld||0}" data-field="stockWeld" data-code="${p.code}"></td>
         <td class="num td-blue"><input class="editable" type="number" value="${p.stockStore||0}" data-field="stockStore" data-code="${p.code}"></td>
         <td class="num td-blue"><input class="editable" type="number" value="${p.pending||0}" data-field="pending" data-code="${p.code}"></td>
