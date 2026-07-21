@@ -245,7 +245,7 @@
             <th class="num th-blue">รวมสต๊อก</th>
             <th class="num th-amber">ยอดใช้งาน</th>
             <th class="num">ใช้ได้อีก (ด.)</th>
-            <th class="num th-purple">Forecast</th>
+            <th class="num th-purple" style="text-align:center; line-height:1.35;">Forecast<br><span id="thCurrentForecastLabel">Q3/69</span></th>
             <th class="num th-purple" style="text-align:center; line-height:1.35;">Forecast<br><span id="thNextForecastLabel">ถัดไป</span></th>
             <th class="num th-purple">MOQ</th>
             <th class="num th-green">แนะนำสั่ง</th>
@@ -2447,6 +2447,9 @@ function renderTable(){
   const nextQLabelShort = nextQKey ? QUARTERS.find(x=>x.key===nextQKey).label.split(' ')[0] : '-';
   const thNextLabel = document.getElementById('thNextForecastLabel');
   if(thNextLabel) thNextLabel.textContent = nextQLabelShort;
+  const currentQLabelShort = QUARTERS.find(x=>x.key===activeQuarter).label.split(' ')[0];
+  const thCurrentLabel = document.getElementById('thCurrentForecastLabel');
+  if(thCurrentLabel) thCurrentLabel.textContent = currentQLabelShort;
   let parts = Object.values(partsCache).sort((a,b)=>{
     const pa = SORT_PRIORITY[getBadgeInfo(a, activeQuarter).cls] ?? 9;
     const pb = SORT_PRIORITY[getBadgeInfo(b, activeQuarter).cls] ?? 9;
