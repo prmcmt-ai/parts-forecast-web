@@ -248,14 +248,13 @@
             <th class="num">ใช้ได้อีก (ด.)</th>
             <th class="num th-purple" style="text-align:center; line-height:1.35;">Forecast<br><span id="thCurrentForecastLabel">Q3/69</span></th>
             <th class="num th-purple" style="text-align:center; line-height:1.35;">Forecast<br><span id="thNextForecastLabel">ถัดไป</span></th>
-            <th class="num th-purple">MOQ</th>
             <th class="num th-green">แนะนำสั่ง</th>
             <th>สถานะ</th>
             <th></th>
           </tr>
         </thead>
         <tbody id="tableBody">
-          <tr><td colspan="14" class="empty-hint">กำลังโหลดข้อมูล...</td></tr>
+          <tr><td colspan="13" class="empty-hint">กำลังโหลดข้อมูล...</td></tr>
         </tbody>
       </table>
     </div>
@@ -2469,7 +2468,7 @@ function renderTable(){
   }
 
   if(!parts.length){
-    tbody.innerHTML = '<tr><td colspan="14" class="empty-hint">ไม่พบข้อมูล — ลองกด "โหลดข้อมูลเริ่มต้น" ด้านบน หรือปรับตัวกรอง</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="13" class="empty-hint">ไม่พบข้อมูล — ลองกด "โหลดข้อมูลเริ่มต้น" ด้านบน หรือปรับตัวกรอง</td></tr>';
     return;
   }
 
@@ -2507,7 +2506,6 @@ function renderTable(){
         <td class="num"><span class="months-tag ${mClass}">${months>=999?'∞':months.toFixed(1)}</span></td>
         <td class="num td-purple">${fmt(forecastQ)}</td>
         <td class="num td-purple" style="color:var(--muted);">${nextQKey ? fmt(nextForecastQ) : '-'}</td>
-        <td class="num td-purple"><input class="editable" type="number" value="${p.moq||0}" data-field="moq" data-code="${p.code}"></td>
         <td class="num td-green"><b>${recommended>0?fmt(recommended):'-'}</b></td>
         <td><span class="badge ${badgeClass}">${badgeLabel}</span></td>
         <td>
@@ -2656,7 +2654,7 @@ function openModal(code){
     <div class="info-grid">
       <div><span>สต๊อก(เชื่อม+สโตร์)+ค้างส่ง</span>${fmt(totalStock)}</div>
       <div><span>Forecast (ประมาณการ)</span>${fmt(forecastQ)}</div>
-      <div><span>MOQ</span>${fmt(part.moq)}</div>
+      <div><span>MOQ</span><input class="editable" type="number" style="width:70px; text-align:right;" value="${part.moq||0}" data-field="moq" data-code="${part.code}"></div>
       <div><span>ยอดแนะนำสั่ง</span><b>${fmt(recommended)}</b></div>
       <div><span>เบิกใช้จริงไตรมาสนี้</span>${fmt(qState.actualUsed||0)}</div>
       ${realDemand ? `<div><span style="color:var(--red);">ยอดใช้งาน (ยืนยันจริง)</span><b style="color:var(--red);">${fmt(realDemand)}</b></div>` : ''}
@@ -2678,6 +2676,9 @@ function openModal(code){
   document.getElementById('btnReceive')?.addEventListener('click', ()=> doReceive(code, q));
   document.getElementById('btnReopen')?.addEventListener('click', ()=> doReopen(code, q));
   document.getElementById('btnShiftExcess')?.addEventListener('click', ()=> doShiftExcessToNextQuarter(code, q));
+  document.getElementById('modalBody').querySelectorAll('.editable').forEach(inp=>{
+    inp.addEventListener('change', async (e)=>{ await onFieldEdit(e); openModal(code); });
+  });
 
   document.getElementById('modalBackdrop').classList.add('show');
 }
